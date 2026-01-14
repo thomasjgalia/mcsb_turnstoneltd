@@ -87,7 +87,7 @@ export async function getConnection() {
     // Validate required environment variables
     const user = process.env.ORACLE_USER || 'ADMIN';
     const password = process.env.ORACLE_PASSWORD;
-    const connectString = process.env.ORACLE_CONNECTION_STRING;
+    let connectString = process.env.ORACLE_CONNECTION_STRING;
 
     console.log('Connection details:', { user, connectString, hasPassword: !!password });
 
@@ -105,6 +105,13 @@ export async function getConnection() {
     if (walletConfig) {
       process.env.TNS_ADMIN = walletConfig.walletLocation;
       console.log('TNS_ADMIN set to:', process.env.TNS_ADMIN);
+
+      // When using wallet with thin mode, use service name from tnsnames.ora
+      // instead of full TNS descriptor
+      if (connectString && connectString.includes('(description=')) {
+        connectString = 'mcsb_high'; // Use the service name from tnsnames.ora
+        console.log('Using service name from tnsnames.ora:', connectString);
+      }
     }
 
     // Connection configuration
