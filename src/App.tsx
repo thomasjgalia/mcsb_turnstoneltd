@@ -1,0 +1,225 @@
+import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { supabase } from './lib/supabase';
+import type { User } from '@supabase/supabase-js';
+import type { CartItem, SearchResult, DomainType } from './lib/types';
+
+// Components (will be created next)
+import Navigation from './components/Navigation';
+import ShoppingCart from './components/ShoppingCart';
+import Step1Search from './components/Step1Search';
+import Step2Hierarchy from './components/Step2Hierarchy';
+import Step3CodeSet from './components/Step3CodeSet';
+import AuthPage from './components/AuthPage';
+
+function AppContent() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [shoppingCart, setShoppingCart] = useState<CartItem[]>([]);
+  const [selectedConcept, setSelectedConcept] = useState<SearchResult | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<DomainType | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Check if auth is disabled for local development
+  const authDisabled = import.meta.env.VITE_DISABLE_AUTH === 'true';
+
+  // Check for existing session on mount
+  useEffect(() => {
+    // Skip auth check if disabled
+    if (authDisabled) {
+      setUser({ id: 'local-dev', email: 'dev@local.test' } as User);
+      setLoading(false);
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [authDisabled]);
+
+  // Shopping cart functions
+  const addToCart = (item: CartItem) => {
+    // Check if item already exists in cart
+    const exists = shoppingCart.some(
+      (cartItem) => cartItem.hierarchy_concept_id === item.hierarchy_concept_id
+    );
+
+    if (!exists) {
+      setShoppingCart([...shoppingCart, item]);
+    }
+  };
+
+  const removeFromCart = (hierarchyConceptId: number) => {
+    setShoppingCart(shoppingCart.filter((item) => item.hierarchy_concept_id !== hierarchyConceptId));
+  };
+
+  const clearCart = () => {
+    setShoppingCart([]);
+  };
+
+  // Navigation functions
+  const goToStep = (step: 1 | 2 | 3) => {
+    setCurrentStep(step);
+  };
+
+  const handleConceptSelected = (concept: SearchResult, domain: DomainType) => {
+    setSelectedConcept(concept);
+    setSelectedDomain(domain);
+    setCurrentStep(2);
+    navigate('/hierarchy');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated, show auth page
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Medical Code Set Builder
+                </h1>
+                <p className="text-sm text-gray-500">OMOP Vocabulary Explorer</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-600">{user.email}</span>
+                <button
+                  onClick={() => supabase.auth.signOut()}
+                  className="btn-secondary text-sm"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Navigation Progress Indicator */}
+        <Navigation
+          currentStep={currentStep}
+          onStepClick={goToStep}
+          cartItemCount={shoppingCart.length}
+          onCartClick={() => setIsCartOpen(true)}
+        />
+
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Main Content Area - Full Width */}
+          <div>
+            <Routes>
+                <Route
+                  path="/"
+                  element={<Navigate to="/search" replace />}
+                />
+                <Route
+                  path="/search"
+                  element={
+                    <Step1Search
+                      onConceptSelected={handleConceptSelected}
+                      currentStep={currentStep}
+                    />
+                  }
+                />
+                <Route
+                  path="/hierarchy"
+                  element={
+                    <Step2Hierarchy
+                      selectedConcept={selectedConcept}
+                      selectedDomain={selectedDomain}
+                      onAddToCart={addToCart}
+                      onBackToSearch={() => goToStep(1)}
+                      onProceedToCodeSet={() => {
+                        setCurrentStep(3);
+                        navigate('/codeset');
+                      }}
+                      currentStep={currentStep}
+                    />
+                  }
+                />
+                <Route
+                  path="/codeset"
+                  element={
+                    <Step3CodeSet
+                      shoppingCart={shoppingCart}
+                      onBackToHierarchy={() => {
+                        setCurrentStep(2);
+                        navigate('/hierarchy');
+                      }}
+                      onBackToSearch={() => {
+                        setCurrentStep(1);
+                        navigate('/search');
+                      }}
+                      onStartOver={() => {
+                        clearCart();
+                        setSelectedConcept(null);
+                        setSelectedDomain(null);
+                        setCurrentStep(1);
+                        navigate('/search');
+                      }}
+                      currentStep={currentStep}
+                    />
+                  }
+                />
+              </Routes>
+          </div>
+        </main>
+
+        {/* Shopping Cart Slide-out Panel */}
+        <ShoppingCart
+          items={shoppingCart}
+          onRemove={removeFromCart}
+          onClear={clearCart}
+          onBuildCodeSet={() => goToStep(3)}
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+        />
+
+        {/* Footer */}
+        <footer className="bg-white border-t border-gray-200 mt-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <p className="text-center text-sm text-gray-500">
+              Medical Code Set Builder - Oracle Cloud Edition | Built with React + Oracle + Supabase
+            </p>
+          </div>
+        </footer>
+      </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
+}
+
+export default App;

@@ -1,0 +1,13 @@
+{
+  "name": "mcsb-oracle-api",
+  "version": "1.0.0",
+  "description": "Backend API for Medical Code Set Builder",
+  "type": "module",
+  "dependencies": {
+    "oracledb": "^6.3.0",
+    "@supabase/supabase-js": "^2.39.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
