@@ -10,7 +10,7 @@ import {
   buildVocabularySQL,
   createErrorResponse,
   createSuccessResponse,
-} from './lib/oracle';
+} from './lib/oracle.js';
 
 interface CodeSetRequest {
   concept_ids: number[];
