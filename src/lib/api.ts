@@ -58,7 +58,7 @@ export const searchConcepts = async (
 
     return response.data.data;
   } catch (error) {
-    handleApiError(error);
+    return handleApiError(error);
   }
 };
 
@@ -80,7 +80,7 @@ export const getHierarchy = async (
 
     return response.data.data;
   } catch (error) {
-    handleApiError(error);
+    return handleApiError(error);
   }
 };
 
@@ -102,7 +102,7 @@ export const buildCodeSet = async (
 
     return response.data.data;
   } catch (error) {
-    handleApiError(error);
+    return handleApiError(error);
   }
 };
 

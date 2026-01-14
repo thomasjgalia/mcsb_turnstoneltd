@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { PackageCheck, Loader2, AlertCircle, Download, Copy, CheckCircle, RotateCcw, ArrowLeft, Plus } from 'lucide-react';
 import { buildCodeSet, exportToTxt, exportToSql } from '../lib/api';
 import type { CartItem, CodeSetResult, ComboFilter } from '../lib/types';
@@ -16,7 +16,6 @@ export default function Step3CodeSet({
   onBackToHierarchy,
   onBackToSearch,
   onStartOver,
-  currentStep,
 }: Step3CodeSetProps) {
   const [results, setResults] = useState<CodeSetResult[]>([]);
   const [loading, setLoading] = useState(false);

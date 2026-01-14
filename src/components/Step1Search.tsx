@@ -11,7 +11,7 @@ interface Step1SearchProps {
 
 const DOMAINS: DomainType[] = ['Condition', 'Drug', 'Procedure', 'Measurement', 'Observation', 'Device'];
 
-export default function Step1Search({ onConceptSelected, currentStep }: Step1SearchProps) {
+export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [domain, setDomain] = useState<DomainType | ''>('');
   const [results, setResults] = useState<SearchResult[]>([]);
