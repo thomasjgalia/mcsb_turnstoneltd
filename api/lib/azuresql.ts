@@ -17,32 +17,18 @@ async function getPool(): Promise<sql.ConnectionPool> {
     return pool;
   }
 
-  const config: sql.config = {
-    server: process.env.AZURE_SQL_SERVER || '',
-    database: process.env.AZURE_SQL_DATABASE || '',
-    user: process.env.AZURE_SQL_USER || '',
-    password: process.env.AZURE_SQL_PASSWORD || '',
-    options: {
-      encrypt: true, // Required for Azure
-      trustServerCertificate: true, // Required for Azure SQL with mssql library
-      connectTimeout: 30000,
-      requestTimeout: 30000,
-    },
-    pool: {
-      max: 10,
-      min: 0,
-      idleTimeoutMillis: 30000,
-    },
-  };
+  // Try connection string format to handle special characters in password
+  const connectionString = `Server=${process.env.AZURE_SQL_SERVER},1433;Database=${process.env.AZURE_SQL_DATABASE};User Id=${process.env.AZURE_SQL_USER};Password=${process.env.AZURE_SQL_PASSWORD};Encrypt=true;TrustServerCertificate=true;Connection Timeout=30`;
 
   console.log('Creating Azure SQL connection pool...', {
-    server: config.server,
-    database: config.database,
-    user: config.user,
+    server: process.env.AZURE_SQL_SERVER,
+    database: process.env.AZURE_SQL_DATABASE,
+    user: process.env.AZURE_SQL_USER,
+    passwordLength: process.env.AZURE_SQL_PASSWORD?.length,
   });
 
   try {
-    pool = await sql.connect(config);
+    pool = await sql.connect(connectionString);
     console.log('✅ Azure SQL connection pool created');
     return pool;
   } catch (error) {
