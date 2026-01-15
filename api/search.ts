@@ -7,10 +7,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   executeQuery,
-  buildVocabularySQL,
   createErrorResponse,
-  createSuccessResponse,
-} from './lib/oracle.js';
+} from './lib/azuresql.js';
 
 interface SearchRequest {
   searchterm: string;
@@ -33,11 +31,10 @@ interface SearchResult {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('=== Search API called ===');
   console.log('Method:', req.method);
-  console.log('Oracle Config:', {
-    user: process.env.ORACLE_USER,
-    hasPassword: !!process.env.ORACLE_PASSWORD,
-    connectString: process.env.ORACLE_CONNECTION_STRING,
-    walletLocation: process.env.ORACLE_WALLET_LOCATION,
+  console.log('Azure SQL Config:', {
+    server: process.env.AZURE_SQL_SERVER,
+    database: process.env.AZURE_SQL_DATABASE,
+    hasPassword: !!process.env.AZURE_SQL_PASSWORD,
   });
 
   // Handle CORS preflight
@@ -65,56 +62,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json(createErrorResponse('Domain ID is required', 400));
     }
 
-    // Build the SQL query (v3 - improved sorting and added searched_vocabulary)
+    // Build vocabulary IN clause based on domain
+    let vocabularyList: string;
+    switch (domain_id) {
+      case 'Condition':
+        vocabularyList = "('ICD10CM','SNOMED','ICD9CM')";
+        break;
+      case 'Observation':
+        vocabularyList = "('ICD10CM','SNOMED','LOINC','CPT4','HCPCS')";
+        break;
+      case 'Drug':
+        vocabularyList = "('RxNorm','NDC','CPT4','CVX','HCPCS','ATC')";
+        break;
+      case 'Measurement':
+        vocabularyList = "('LOINC','CPT4','SNOMED','HCPCS')";
+        break;
+      case 'Procedure':
+        vocabularyList = "('CPT4','HCPCS','SNOMED','ICD09PCS','LOINC','ICD10PCS')";
+        break;
+      default:
+        vocabularyList = "('')";
+    }
+
+    // Build the SQL query (T-SQL syntax for Azure SQL)
     const sql = `
-      SELECT
-        S.CONCEPT_NAME               AS "standard_name",
-        S.CONCEPT_ID                 AS "std_concept_id",
-        S.CONCEPT_CODE               AS "standard_code",
-        S.VOCABULARY_ID              AS "standard_vocabulary",
-        S.CONCEPT_CLASS_ID           AS "concept_class_id",
-        C.CONCEPT_NAME               AS "search_result",
-        C.CONCEPT_CODE               AS "searched_code",
-        C.VOCABULARY_ID              AS "searched_vocabulary",
-        C.CONCEPT_CLASS_ID           AS "searched_concept_class_id",
-        TO_CHAR(C.CONCEPT_ID) || ' ' || C.CONCEPT_CODE || ' ' || C.CONCEPT_NAME AS "searched_term"
-      FROM CONCEPT C
-      LEFT JOIN CONCEPT_RELATIONSHIP CR
-        ON CR.CONCEPT_ID_1 = C.CONCEPT_ID
-       AND CR.RELATIONSHIP_ID = 'Maps to'
-      LEFT JOIN CONCEPT S
-        ON S.CONCEPT_ID = CR.CONCEPT_ID_2
-       AND S.STANDARD_CONCEPT = 'S'
+      SELECT TOP 75
+        s.concept_name               AS standard_name,
+        s.concept_id                 AS std_concept_id,
+        s.concept_code               AS standard_code,
+        s.vocabulary_id              AS standard_vocabulary,
+        s.concept_class_id           AS concept_class_id,
+        c.concept_name               AS search_result,
+        c.concept_code               AS searched_code,
+        c.vocabulary_id              AS searched_vocabulary,
+        c.concept_class_id           AS searched_concept_class_id,
+        CAST(c.concept_id AS NVARCHAR) + ' ' + c.concept_code + ' ' + c.concept_name AS searched_term
+      FROM concept c
+      LEFT JOIN concept_relationship cr
+        ON cr.concept_id_1 = c.concept_id
+       AND cr.relationship_id = 'Maps to'
+      LEFT JOIN concept s
+        ON s.concept_id = cr.concept_id_2
+       AND s.standard_concept = 'S'
       WHERE
-        UPPER(TO_CHAR(C.CONCEPT_ID) || ' ' || C.CONCEPT_CODE || ' ' || C.CONCEPT_NAME)
-          LIKE '%' || UPPER(:searchterm) || '%'
-        AND C.DOMAIN_ID = :domain_id
-        AND C.VOCABULARY_ID IN (
-          SELECT COLUMN_VALUE
-          FROM TABLE(
-            CAST(
-              CASE :domain_id
-                WHEN 'Condition'   THEN sys.odcivarchar2list('ICD10CM','SNOMED','ICD9CM')
-                WHEN 'Observation' THEN sys.odcivarchar2list('ICD10CM','SNOMED','LOINC','CPT4','HCPCS')
-                WHEN 'Drug'        THEN sys.odcivarchar2list('RxNorm','NDC','CPT4','CVX','HCPCS','ATC')
-                WHEN 'Measurement' THEN sys.odcivarchar2list('LOINC','CPT4','SNOMED','HCPCS')
-                WHEN 'Procedure'   THEN sys.odcivarchar2list('CPT4','HCPCS','SNOMED','ICD09PCS','LOINC','ICD10PCS','SNOMED')
-                ELSE sys.odcivarchar2list()
-              END
-              AS sys.odcivarchar2list
-            )
-          )
-        )
+        UPPER(CAST(c.concept_id AS NVARCHAR) + ' ' + c.concept_code + ' ' + c.concept_name)
+          LIKE '%' + UPPER(@searchterm) + '%'
+        AND c.domain_id = @domain_id
+        AND c.vocabulary_id IN ${vocabularyList}
         AND (
-             C.DOMAIN_ID <> 'Drug'
-          OR C.CONCEPT_CLASS_ID IN (
+             c.domain_id <> 'Drug'
+          OR c.concept_class_id IN (
                'Clinical Drug','Branded Drug','Ingredient','Clinical Pack','Branded Pack',
                'Quant Clinical Drug','Quant Branded Drug','11-digit NDC'
              )
         )
-        AND (C.INVALID_REASON IS NULL OR C.INVALID_REASON = '')
-      ORDER BY ABS(LENGTH(:searchterm) - LENGTH(C.CONCEPT_NAME)) ASC
-      FETCH FIRST 75 ROWS ONLY
+        AND (c.invalid_reason IS NULL OR c.invalid_reason = '')
+      ORDER BY ABS(LEN(@searchterm) - LEN(c.concept_name)) ASC
     `;
 
     // Execute query

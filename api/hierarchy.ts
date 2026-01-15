@@ -7,10 +7,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   executeQuery,
-  buildVocabularySQL,
   createErrorResponse,
-  createSuccessResponse,
-} from './lib/oracle.js';
+} from './lib/azuresql.js';
 
 interface HierarchyRequest {
   concept_id: number;
@@ -49,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // First, get the domain_id for the concept
     const domainSQL = `
-      SELECT domain_id AS "domain_id" FROM concept WHERE concept_id = :concept_id
+      SELECT domain_id FROM concept WHERE concept_id = @concept_id
     `;
 
     const domainResult = await executeQuery<{ domain_id: string }>(domainSQL, {
@@ -65,88 +63,80 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const domain_id = domainResult[0].domain_id;
 
+    // Build vocabulary IN clause based on domain
+    let vocabularyList: string;
+    switch (domain_id) {
+      case 'Condition':
+        vocabularyList = "('ICD10CM','SNOMED','ICD9CM')";
+        break;
+      case 'Observation':
+        vocabularyList = "('ICD10CM','SNOMED','LOINC','CPT4','HCPCS')";
+        break;
+      case 'Drug':
+        vocabularyList = "('RxNorm','NDC','CPT4','CVX','HCPCS','ATC')";
+        break;
+      case 'Measurement':
+        vocabularyList = "('LOINC','CPT4','SNOMED','HCPCS')";
+        break;
+      case 'Procedure':
+        vocabularyList = "('CPT4','HCPCS','SNOMED','ICD09PCS','LOINC','ICD10PCS')";
+        break;
+      default:
+        vocabularyList = "('')";
+    }
+
     // Build the main hierarchy query (v3 - using Tom's working approach)
-    // The CONCEPT_ANCESTOR table includes self-referential rows (steps_away=0)
+    // The concept_ancestor table includes self-referential rows (steps_away=0)
     // so we get ancestors + the concept itself in the first query, descendants in the second
     const sql = `
       SELECT
-        CA.MIN_LEVELS_OF_SEPARATION              AS "steps_away",
-        A.CONCEPT_NAME                           AS "concept_name",
-        A.CONCEPT_ID                             AS "hierarchy_concept_id",
-        A.VOCABULARY_ID                          AS "vocabulary_id",
-        A.CONCEPT_CLASS_ID                       AS "concept_class_id",
-        C.CONCEPT_NAME                           AS "root_term"
-      FROM CONCEPT C
-      JOIN CONCEPT_ANCESTOR CA
-        ON CA.DESCENDANT_CONCEPT_ID = C.CONCEPT_ID
-      JOIN CONCEPT A
-        ON A.CONCEPT_ID = CA.ANCESTOR_CONCEPT_ID
+        ca.min_levels_of_separation              AS steps_away,
+        a.concept_name                           AS concept_name,
+        a.concept_id                             AS hierarchy_concept_id,
+        a.vocabulary_id                          AS vocabulary_id,
+        a.concept_class_id                       AS concept_class_id,
+        c.concept_name                           AS root_term
+      FROM concept c
+      JOIN concept_ancestor ca
+        ON ca.descendant_concept_id = c.concept_id
+      JOIN concept a
+        ON a.concept_id = ca.ancestor_concept_id
       WHERE
-        C.CONCEPT_ID = :concept_id
-        AND A.VOCABULARY_ID IN (
-          SELECT COLUMN_VALUE
-          FROM TABLE(
-            CAST(
-              CASE :domain_id
-                WHEN 'Condition'   THEN sys.odcivarchar2list('ICD10CM','SNOMED','ICD9CM')
-                WHEN 'Observation' THEN sys.odcivarchar2list('ICD10CM','SNOMED','LOINC','CPT4','HCPCS')
-                WHEN 'Drug'        THEN sys.odcivarchar2list('RxNorm','NDC','CPT4','CVX','HCPCS','ATC')
-                WHEN 'Measurement' THEN sys.odcivarchar2list('LOINC','CPT4','SNOMED','HCPCS')
-                WHEN 'Procedure'   THEN sys.odcivarchar2list('CPT4','HCPCS','SNOMED','ICD09PCS','LOINC','ICD10PCS','SNOMED')
-                ELSE sys.odcivarchar2list()
-              END
-              AS sys.odcivarchar2list
-            )
-          )
-        )
+        c.concept_id = @concept_id
+        AND a.vocabulary_id IN ${vocabularyList}
         AND (
-             (:domain_id = 'Drug' AND (
-                  (A.VOCABULARY_ID = 'ATC'    AND A.CONCEPT_CLASS_ID IN ('ATC 5th','ATC 4th','ATC 3rd','ATC 2nd','ATC 1st'))
-               OR (A.VOCABULARY_ID = 'RxNorm' AND A.CONCEPT_CLASS_ID IN ('Clinical Drug','Ingredient'))
+             (@domain_id = 'Drug' AND (
+                  (a.vocabulary_id = 'ATC'    AND a.concept_class_id IN ('ATC 5th','ATC 4th','ATC 3rd','ATC 2nd','ATC 1st'))
+               OR (a.vocabulary_id = 'RxNorm' AND a.concept_class_id IN ('Clinical Drug','Ingredient'))
              ))
-          OR (:domain_id <> 'Drug')
+          OR (@domain_id <> 'Drug')
         )
 
       UNION
 
       SELECT
-        CA.MIN_LEVELS_OF_SEPARATION * -1         AS "steps_away",
-        A.CONCEPT_NAME                           AS "concept_name",
-        A.CONCEPT_ID                             AS "hierarchy_concept_id",
-        A.VOCABULARY_ID                          AS "vocabulary_id",
-        A.CONCEPT_CLASS_ID                       AS "concept_class_id",
-        C.CONCEPT_NAME                           AS "root_term"
-      FROM CONCEPT C
-      JOIN CONCEPT_ANCESTOR CA
-        ON CA.ANCESTOR_CONCEPT_ID = C.CONCEPT_ID
-      JOIN CONCEPT A
-        ON A.CONCEPT_ID = CA.DESCENDANT_CONCEPT_ID
+        ca.min_levels_of_separation * -1         AS steps_away,
+        a.concept_name                           AS concept_name,
+        a.concept_id                             AS hierarchy_concept_id,
+        a.vocabulary_id                          AS vocabulary_id,
+        a.concept_class_id                       AS concept_class_id,
+        c.concept_name                           AS root_term
+      FROM concept c
+      JOIN concept_ancestor ca
+        ON ca.ancestor_concept_id = c.concept_id
+      JOIN concept a
+        ON a.concept_id = ca.descendant_concept_id
       WHERE
-        C.CONCEPT_ID = :concept_id
-        AND A.VOCABULARY_ID IN (
-          SELECT COLUMN_VALUE
-          FROM TABLE(
-            CAST(
-              CASE :domain_id
-                WHEN 'Condition'   THEN sys.odcivarchar2list('ICD10CM','SNOMED','ICD9CM')
-                WHEN 'Observation' THEN sys.odcivarchar2list('ICD10CM','SNOMED','LOINC','CPT4','HCPCS')
-                WHEN 'Drug'        THEN sys.odcivarchar2list('RxNorm','NDC','CPT4','CVX','HCPCS','ATC')
-                WHEN 'Measurement' THEN sys.odcivarchar2list('LOINC','CPT4','SNOMED','HCPCS')
-                WHEN 'Procedure'   THEN sys.odcivarchar2list('CPT4','HCPCS','SNOMED','ICD09PCS','LOINC','ICD10PCS','SNOMED')
-                ELSE sys.odcivarchar2list()
-              END
-              AS sys.odcivarchar2list
-            )
-          )
-        )
+        c.concept_id = @concept_id
+        AND a.vocabulary_id IN ${vocabularyList}
         AND (
-             (:domain_id = 'Drug' AND (
-                  (A.VOCABULARY_ID = 'RxNorm' AND A.CONCEPT_CLASS_ID IN ('Clinical Drug','Ingredient'))
+             (@domain_id = 'Drug' AND (
+                  (a.vocabulary_id = 'RxNorm' AND a.concept_class_id IN ('Clinical Drug','Ingredient'))
              ))
-          OR (:domain_id <> 'Drug')
+          OR (@domain_id <> 'Drug')
         )
 
-      ORDER BY "steps_away" DESC
+      ORDER BY steps_away DESC
     `;
 
     // Execute query
