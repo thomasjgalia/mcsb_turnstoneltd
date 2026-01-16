@@ -93,23 +93,12 @@ export default function Step3CodeSet({
         throw new Error('Not authenticated');
       }
 
-      // Convert filtered results (actual built code set) to SavedCodeSetConcept format
-      // Get domain from shopping cart (all items have same domain)
-      const domain = shoppingCart.length > 0 ? shoppingCart[0].domain_id : 'Condition';
-
-      const concepts = filteredResults.map(result => ({
-        hierarchy_concept_id: result.child_concept_id,
-        concept_name: result.child_name,
-        vocabulary_id: result.child_vocabulary_id,
-        concept_class_id: result.concept_class_id,
-        root_term: result.root_concept_name,
-        domain_id: domain,
-      }));
-
+      // Save the shopping cart items (hierarchy concepts), not the built code set
+      // This allows saving before building
       await saveCodeSet(session.user.id, {
         code_set_name: name,
         description: description || `Saved on ${new Date().toLocaleDateString()}`,
-        concepts: concepts,
+        concepts: shoppingCart,
       });
 
       setSaveSuccess(true);

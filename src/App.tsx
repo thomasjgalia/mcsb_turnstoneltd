@@ -293,7 +293,10 @@ function AppContent() {
           items={shoppingCart}
           onRemove={removeFromCart}
           onClear={clearCart}
-          onBuildCodeSet={() => goToStep(3)}
+          onBuildCodeSet={() => {
+            setCurrentStep(3);
+            navigate('/codeset');
+          }}
           isOpen={isCartOpen}
           onClose={() => setIsCartOpen(false)}
         />
