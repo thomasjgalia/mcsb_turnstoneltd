@@ -117,6 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
              )
         )
         AND (c.invalid_reason IS NULL OR c.invalid_reason = '')
+        AND s.concept_id IS NOT NULL
       ORDER BY ABS(LEN(@searchterm) - LEN(c.concept_name)) ASC
     `;
 
