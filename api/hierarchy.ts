@@ -85,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         vocabularyList = "('')";
     }
 
-    // Build the main hierarchy query (v3 - using Tom's working approach)
+    // Build the main hierarchy query (v4 - added Measurement domain filter)
     // The concept_ancestor table includes self-referential rows (steps_away=0)
     // so we get ancestors + the concept itself in the first query, descendants in the second
     const sql = `
@@ -105,11 +105,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         c.concept_id = @concept_id
         AND a.vocabulary_id IN ${vocabularyList}
         AND (
+             -- Drug domain refinement
              (@domain_id = 'Drug' AND (
                   (a.vocabulary_id = 'ATC'    AND a.concept_class_id IN ('ATC 5th','ATC 4th','ATC 3rd','ATC 2nd','ATC 1st'))
                OR (a.vocabulary_id = 'RxNorm' AND a.concept_class_id IN ('Clinical Drug','Ingredient'))
              ))
-          OR (@domain_id <> 'Drug')
+          -- Measurement domain: Only LOINC Lab Test
+          OR (@domain_id = 'Measurement' AND a.vocabulary_id = 'LOINC' AND a.concept_class_id = 'Lab Test')
+          -- Pass-through logic for all other domains
+          OR (@domain_id NOT IN ('Drug','Measurement'))
         )
 
       UNION
@@ -130,10 +134,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         c.concept_id = @concept_id
         AND a.vocabulary_id IN ${vocabularyList}
         AND (
+             -- Drug domain descendant refinement
              (@domain_id = 'Drug' AND (
-                  (a.vocabulary_id = 'RxNorm' AND a.concept_class_id IN ('Clinical Drug','Ingredient'))
+                  a.vocabulary_id = 'RxNorm' AND a.concept_class_id IN ('Clinical Drug','Ingredient')
              ))
-          OR (@domain_id <> 'Drug')
+          -- Measurement domain: Only LOINC Lab Test
+          OR (@domain_id = 'Measurement' AND a.vocabulary_id = 'LOINC' AND a.concept_class_id = 'Lab Test')
+          -- Pass-through for all other domains
+          OR (@domain_id NOT IN ('Drug','Measurement'))
         )
 
       ORDER BY steps_away DESC
