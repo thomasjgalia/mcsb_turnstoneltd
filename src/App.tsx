@@ -12,6 +12,7 @@ import Step1Search from './components/Step1Search';
 import Step2Hierarchy from './components/Step2Hierarchy';
 import Step3CodeSet from './components/Step3CodeSet';
 import AuthPage from './components/AuthPage';
+import DirectionsModal from './components/DirectionsModal';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ function AppContent() {
   const [selectedConcept, setSelectedConcept] = useState<SearchResult | null>(null);
   const [selectedDomain, setSelectedDomain] = useState<DomainType | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isDirectionsOpen, setIsDirectionsOpen] = useState(false);
 
   // Check if auth is disabled for local development
   const authDisabled = import.meta.env.VITE_DISABLE_AUTH === 'true';
@@ -64,6 +66,8 @@ function AppContent() {
         })
         .catch((error) => {
           console.error('Database warmup failed:', error);
+          // Still mark as ready to prevent infinite loop
+          setDbReady(true);
           setDbWarming(false);
           // Don't block the UI, just log the error
         });
@@ -151,6 +155,12 @@ function AppContent() {
                 <p className="text-sm text-gray-500">OMOP Vocabulary Explorer</p>
               </div>
               <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setIsDirectionsOpen(true)}
+                  className="btn-secondary text-sm"
+                >
+                  How to Use
+                </button>
                 <span className="text-sm text-gray-600">{user.email}</span>
                 <button
                   onClick={() => supabase.auth.signOut()}
@@ -254,6 +264,12 @@ function AppContent() {
             </p>
           </div>
         </footer>
+
+        {/* Directions Modal */}
+        <DirectionsModal
+          isOpen={isDirectionsOpen}
+          onClose={() => setIsDirectionsOpen(false)}
+        />
       </div>
   );
 }

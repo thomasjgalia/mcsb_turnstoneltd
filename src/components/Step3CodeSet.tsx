@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PackageCheck, Loader2, AlertCircle, Download, Copy, CheckCircle, RotateCcw, ArrowLeft, Plus } from 'lucide-react';
+import { PackageCheck, Loader2, AlertCircle, Download, Copy, CheckCircle, RotateCcw, ArrowLeft, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { buildCodeSet, exportToTxt, exportToSql } from '../lib/api';
 import type { CartItem, CodeSetResult, ComboFilter } from '../lib/types';
 
@@ -23,6 +23,9 @@ export default function Step3CodeSet({
   const [comboFilter, setComboFilter] = useState<ComboFilter>('ALL');
   const [sqlCopied, setSqlCopied] = useState(false);
   const [hasBuilt, setHasBuilt] = useState(false);
+  const [selectedVocabularies, setSelectedVocabularies] = useState<Set<string>>(new Set());
+  const [excludedCodes, setExcludedCodes] = useState<Set<string>>(new Set());
+  const [collapsedVocabs, setCollapsedVocabs] = useState<Set<string>>(new Set());
 
   const buildSet = async () => {
     if (shoppingCart.length === 0) return;
@@ -52,12 +55,12 @@ export default function Step3CodeSet({
   };
 
   const handleExportTxt = () => {
-    exportToTxt(results);
+    exportToTxt(filteredResults);
   };
 
   const handleCopySql = async () => {
     try {
-      await exportToSql(results);
+      await exportToSql(filteredResults);
       setSqlCopied(true);
       setTimeout(() => setSqlCopied(false), 2000);
     } catch (err) {
@@ -65,14 +68,76 @@ export default function Step3CodeSet({
     }
   };
 
-  // Group results by vocabulary
-  const groupedResults = results.reduce((acc, result) => {
+  // Get unique vocabularies from results
+  const availableVocabularies = Array.from(
+    new Set(results.map((r) => r.child_vocabulary_id))
+  ).sort();
+
+  // Filter results based on selected vocabularies only (keep excluded codes visible)
+  const visibleResults = results
+    .filter((r) => selectedVocabularies.size === 0 || selectedVocabularies.has(r.child_vocabulary_id));
+
+  // Filter for export (exclude unchecked codes)
+  const filteredResults = visibleResults
+    .filter((r) => !excludedCodes.has(`${r.child_vocabulary_id}:${r.child_code}`));
+
+  // Group visible results by vocabulary (includes excluded codes for display)
+  const groupedResults = visibleResults.reduce((acc, result) => {
     if (!acc[result.child_vocabulary_id]) {
       acc[result.child_vocabulary_id] = [];
     }
     acc[result.child_vocabulary_id].push(result);
     return acc;
   }, {} as Record<string, CodeSetResult[]>);
+
+  // Toggle vocabulary filter
+  const toggleVocabulary = (vocab: string) => {
+    const newSelected = new Set(selectedVocabularies);
+    if (newSelected.has(vocab)) {
+      newSelected.delete(vocab);
+    } else {
+      newSelected.add(vocab);
+    }
+    setSelectedVocabularies(newSelected);
+  };
+
+  // Select all vocabularies
+  const selectAllVocabularies = () => {
+    setSelectedVocabularies(new Set(availableVocabularies));
+  };
+
+  // Clear all vocabulary selections
+  const clearAllVocabularies = () => {
+    setSelectedVocabularies(new Set());
+  };
+
+  // Toggle individual code exclusion
+  const toggleCodeExclusion = (vocab: string, code: string) => {
+    const key = `${vocab}:${code}`;
+    const newExcluded = new Set(excludedCodes);
+    if (newExcluded.has(key)) {
+      newExcluded.delete(key);
+    } else {
+      newExcluded.add(key);
+    }
+    setExcludedCodes(newExcluded);
+  };
+
+  // Check if a code is excluded
+  const isCodeExcluded = (vocab: string, code: string) => {
+    return excludedCodes.has(`${vocab}:${code}`);
+  };
+
+  // Toggle vocabulary collapse state
+  const toggleVocabCollapse = (vocab: string) => {
+    const newCollapsed = new Set(collapsedVocabs);
+    if (newCollapsed.has(vocab)) {
+      newCollapsed.delete(vocab);
+    } else {
+      newCollapsed.add(vocab);
+    }
+    setCollapsedVocabs(newCollapsed);
+  };
 
   if (shoppingCart.length === 0) {
     return (
@@ -221,11 +286,71 @@ export default function Step3CodeSet({
       {/* Results */}
       {!loading && results.length > 0 && (
         <>
+          {/* Vocabulary Filter */}
+          {availableVocabularies.length > 1 && (
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Filter by Vocabulary
+                </h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={selectAllVocabularies}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    onClick={clearAllVocabularies}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {availableVocabularies.map((vocab) => {
+                  const count = results.filter((r) => r.child_vocabulary_id === vocab).length;
+                  const isSelected = selectedVocabularies.has(vocab);
+                  return (
+                    <button
+                      key={vocab}
+                      onClick={() => toggleVocabulary(vocab)}
+                      className={`
+                        px-3 py-2 rounded-lg border text-sm font-medium transition-colors
+                        ${
+                          isSelected
+                            ? 'bg-primary-100 border-primary-300 text-primary-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      {vocab} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-sm text-gray-500">
+                {selectedVocabularies.size === 0
+                  ? `Showing all ${visibleResults.length} codes from ${availableVocabularies.length} vocabularies`
+                  : `Showing ${visibleResults.length} of ${results.length} codes from ${selectedVocabularies.size} selected ${selectedVocabularies.size === 1 ? 'vocabulary' : 'vocabularies'}`}
+              </p>
+            </div>
+          )}
+
           {/* Export Buttons */}
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Export Code Set ({results.length} codes)
-            </h3>
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Export Code Set ({filteredResults.length} codes)
+              </h3>
+              {excludedCodes.size > 0 && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {excludedCodes.size} code{excludedCodes.size !== 1 ? 's' : ''} excluded from export
+                </p>
+              )}
+            </div>
             <div className="flex flex-wrap gap-3">
               <button onClick={handleExportTxt} className="btn-primary flex items-center gap-2">
                 <Download className="w-5 h-5" />
@@ -254,18 +379,41 @@ export default function Step3CodeSet({
           </div>
 
           {/* Results by Vocabulary */}
-          {Object.entries(groupedResults).map(([vocabulary, vocabResults]) => (
-            <div key={vocabulary} className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="badge badge-primary">{vocabulary}</span>
-                <span className="text-sm font-normal text-gray-500">
-                  ({vocabResults.length} codes)
-                </span>
-              </h3>
-              <div className="table-container">
+          {Object.entries(groupedResults).map(([vocabulary, vocabResults]) => {
+            const isCollapsed = collapsedVocabs.has(vocabulary);
+            const includedCount = vocabResults.filter((r) => !isCodeExcluded(vocabulary, r.child_code)).length;
+            const excludedCount = vocabResults.length - includedCount;
+
+            return (
+              <div key={vocabulary} className="card">
+                <div
+                  className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 -m-6 p-6 rounded-t-lg"
+                  onClick={() => toggleVocabCollapse(vocabulary)}
+                >
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    {isCollapsed ? (
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    )}
+                    <span className="badge badge-primary">{vocabulary}</span>
+                    <span className="text-sm font-normal text-gray-500">
+                      ({vocabResults.length} codes)
+                    </span>
+                  </h3>
+                  {excludedCount > 0 && (
+                    <span className="text-sm text-gray-600">
+                      {excludedCount} excluded
+                    </span>
+                  )}
+                </div>
+
+                {!isCollapsed && (
+                  <div className="table-container">
                 <table className="table">
                   <thead>
                     <tr>
+                      <th className="w-12"></th>
                       <th>Code</th>
                       <th>Name</th>
                       <th>Concept ID</th>
@@ -276,12 +424,26 @@ export default function Step3CodeSet({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {vocabResults.map((result, index) => (
-                      <tr key={`${result.child_concept_id}-${index}`}>
-                        <td className="font-mono text-sm">{result.child_code}</td>
-                        <td className="font-medium">{result.child_name}</td>
-                        <td className="text-sm">{result.child_concept_id}</td>
-                        <td className="text-xs text-gray-600">{result.concept_class_id}</td>
+                    {vocabResults.map((result, index) => {
+                      const isExcluded = isCodeExcluded(vocabulary, result.child_code);
+                      return (
+                        <tr
+                          key={`${result.child_concept_id}-${index}`}
+                          className={isExcluded ? 'bg-gray-50 opacity-60' : ''}
+                        >
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={!isExcluded}
+                              onChange={() => toggleCodeExclusion(vocabulary, result.child_code)}
+                              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                              title={isExcluded ? "Include in export" : "Exclude from export"}
+                            />
+                          </td>
+                          <td className="font-mono text-sm">{result.child_code}</td>
+                          <td className="font-medium">{result.child_name}</td>
+                          <td className="text-sm">{result.child_concept_id}</td>
+                          <td className="text-xs text-gray-600">{result.concept_class_id}</td>
                         {result.combinationyesno && (
                           <td>
                             <span
@@ -306,12 +468,15 @@ export default function Step3CodeSet({
                           </td>
                         )}
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
         </>
       )}
     </div>
