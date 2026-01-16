@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GitBranch, Loader2, AlertCircle, Plus, ArrowLeft, CheckCircle } from 'lucide-react';
+import { GitBranch, Loader2, AlertCircle, Plus, ArrowLeft, CheckCircle, RotateCw } from 'lucide-react';
 import { getHierarchy } from '../lib/api';
 import type { SearchResult, HierarchyResult, CartItem, DomainType } from '../lib/types';
 
@@ -24,23 +24,25 @@ export default function Step2Hierarchy({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addedItems, setAddedItems] = useState<Set<number>>(new Set());
+  const [selectedConceptClass, setSelectedConceptClass] = useState<string>('');
+  const [currentAnchorId, setCurrentAnchorId] = useState<number | null>(null);
 
   useEffect(() => {
     if (selectedConcept && currentStep === 2) {
-      loadHierarchy();
+      loadHierarchy(selectedConcept.std_concept_id);
     }
   }, [selectedConcept, currentStep]);
 
-  const loadHierarchy = async () => {
-    if (!selectedConcept) return;
-
+  const loadHierarchy = async (conceptId: number) => {
     setLoading(true);
     setError(null);
     setHierarchyResults([]);
+    setSelectedConceptClass('');
+    setCurrentAnchorId(conceptId);
 
     try {
       const data = await getHierarchy({
-        concept_id: selectedConcept.std_concept_id,
+        concept_id: conceptId,
       });
 
       setHierarchyResults(data);
@@ -53,6 +55,10 @@ export default function Step2Hierarchy({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReAnchor = (conceptId: number) => {
+    loadHierarchy(conceptId);
   };
 
   const handleAddToCart = (result: HierarchyResult) => {
@@ -76,10 +82,23 @@ export default function Step2Hierarchy({
 
   const isAdded = (conceptId: number) => addedItems.has(conceptId);
 
-  // Group results by relationship type
-  const parents = hierarchyResults.filter((r) => r.steps_away > 0);
-  const self = hierarchyResults.filter((r) => r.steps_away === 0);
-  const children = hierarchyResults.filter((r) => r.steps_away < 0);
+  // Get unique concept classes from results
+  const availableConceptClasses = Array.from(
+    new Set(hierarchyResults.map((r) => r.concept_class_id))
+  ).sort();
+
+  // Filter results based on concept class selection
+  const filteredResults = hierarchyResults.filter((result) => {
+    if (selectedConceptClass && result.concept_class_id !== selectedConceptClass) {
+      return false;
+    }
+    return true;
+  });
+
+  // Group filtered results by relationship type
+  const parents = filteredResults.filter((r) => r.steps_away > 0);
+  const self = filteredResults.filter((r) => r.steps_away === 0);
+  const children = filteredResults.filter((r) => r.steps_away < 0);
 
   if (!selectedConcept) {
     return (
@@ -100,36 +119,28 @@ export default function Step2Hierarchy({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Step Title */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Step 2: Explore Hierarchy</h2>
-        <p className="text-gray-600 mt-1">
-          Review the hierarchy and choose the starting point (root concept) to add to your code set build.
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {/* Selected Concept Info */}
-      <div className="card bg-primary-50 border-primary-200">
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+      <div className="card p-4 bg-primary-50 border-primary-200">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
               {selectedConcept.standard_name}
             </h3>
-            <div className="flex flex-wrap gap-2">
-              <span className="badge badge-primary">
+            <div className="flex flex-wrap gap-1.5">
+              <span className="badge badge-primary text-xs px-2 py-0.5">
                 {selectedConcept.standard_vocabulary}
               </span>
-              <span className="badge bg-gray-100 text-gray-800">
+              <span className="badge bg-gray-100 text-gray-800 text-xs px-2 py-0.5">
                 ID: {selectedConcept.std_concept_id}
               </span>
-              <span className="badge bg-gray-100 text-gray-800">
-                Code: {selectedConcept.standard_code}
+              <span className="badge bg-gray-100 text-gray-800 text-xs px-2 py-0.5">
+                {selectedConcept.standard_code}
               </span>
             </div>
           </div>
-          <button onClick={onBackToSearch} className="btn-secondary flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" />
+          <button onClick={onBackToSearch} className="btn-secondary flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap">
+            <ArrowLeft className="w-3 h-3" />
             Back
           </button>
         </div>
@@ -151,48 +162,97 @@ export default function Step2Hierarchy({
         </div>
       )}
 
+      {/* Concept Class Filter - Inline */}
+      {!loading && hierarchyResults.length > 0 && availableConceptClasses.length > 1 && (
+        <div className="card p-3">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-gray-700 whitespace-nowrap">Filter:</span>
+            <select
+              value={selectedConceptClass}
+              onChange={(e) => setSelectedConceptClass(e.target.value)}
+              className="select-field text-xs py-1 px-2 flex-1"
+            >
+              <option value="">All Classes ({availableConceptClasses.length})</option>
+              {availableConceptClasses.map((conceptClass) => {
+                const count = hierarchyResults.filter((r) => r.concept_class_id === conceptClass).length;
+                return (
+                  <option key={conceptClass} value={conceptClass}>
+                    {conceptClass} ({count})
+                  </option>
+                );
+              })}
+            </select>
+            {selectedConceptClass && (
+              <>
+                <span className="text-xs text-gray-600 whitespace-nowrap">
+                  {filteredResults.length} / {hierarchyResults.length}
+                </span>
+                <button
+                  onClick={() => setSelectedConceptClass('')}
+                  className="text-xs text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap"
+                >
+                  Clear
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Hierarchy Results */}
       {!loading && hierarchyResults.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Parents (Ancestors) */}
           {parents.length > 0 && (
-            <div className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <GitBranch className="w-5 h-5 text-blue-600" />
+            <div className="card p-3">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
+                <GitBranch className="w-4 h-4 text-blue-600" />
                 Ancestors ({parents.length})
               </h3>
               <div className="table-container">
-                <table className="table">
+                <table className="table compact-table">
                   <thead>
                     <tr>
-                      <th>Steps Away</th>
-                      <th>Concept Name</th>
-                      <th>ID</th>
-                      <th>Vocabulary</th>
-                      <th>Class</th>
-                      <th>Action</th>
+                      <th className="text-xs py-1.5">Steps</th>
+                      <th className="text-xs py-1.5">Concept Name</th>
+                      <th className="text-xs py-1.5">ID</th>
+                      <th className="text-xs py-1.5">Vocab</th>
+                      <th className="text-xs py-1.5">Class</th>
+                      <th className="text-xs py-1.5">Re-anchor</th>
+                      <th className="text-xs py-1.5">Action</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {parents.map((result) => (
                       <tr key={result.hierarchy_concept_id}>
-                        <td>
-                          <span className="badge bg-blue-100 text-blue-800">
+                        <td className="py-1.5 px-2">
+                          <span className="badge bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5">
                             +{result.steps_away}
                           </span>
                         </td>
-                        <td className="font-medium">{result.concept_name}</td>
-                        <td className="text-sm">{result.hierarchy_concept_id}</td>
-                        <td>
-                          <span className="badge badge-primary">{result.vocabulary_id}</span>
+                        <td className="font-medium text-sm py-1.5 px-2">{result.concept_name}</td>
+                        <td className="text-xs py-1.5 px-2">{result.hierarchy_concept_id}</td>
+                        <td className="py-1.5 px-2">
+                          <span className="badge badge-primary text-xs px-1.5 py-0.5">{result.vocabulary_id}</span>
                         </td>
-                        <td className="text-xs text-gray-600">{result.concept_class_id}</td>
-                        <td>
+                        <td className="text-xs text-gray-600 py-1.5 px-2">{result.concept_class_id}</td>
+                        <td className="py-1.5 px-2">
+                          <button
+                            onClick={() => handleReAnchor(result.hierarchy_concept_id)}
+                            disabled={currentAnchorId === result.hierarchy_concept_id}
+                            className="btn-table flex items-center gap-1 text-xs py-0.5 px-1.5"
+                            title="Re-anchor hierarchy on this concept"
+                          >
+                            <RotateCw className="w-3 h-3" />
+                            {currentAnchorId === result.hierarchy_concept_id ? 'Current' : 'Re-anchor'}
+                          </button>
+                        </td>
+                        <td className="py-1.5 px-2">
                           <button
                             onClick={() => handleAddToCart(result)}
                             disabled={isAdded(result.hierarchy_concept_id)}
                             className={`
-                              btn-table flex items-center gap-1 text-xs
+                              btn-table flex items-center gap-1 text-xs py-0.5 px-1.5
                               ${isAdded(result.hierarchy_concept_id) ? 'bg-green-50 text-green-700 border-green-200' : ''}
                             `}
                           >
@@ -219,43 +279,55 @@ export default function Step2Hierarchy({
 
           {/* Selected Concept (Self - steps_away = 0) */}
           {self.length > 0 && (
-            <div className="card border-2 border-purple-300 bg-purple-50">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <GitBranch className="w-5 h-5 text-purple-600" />
+            <div className="card p-3 border-2 border-purple-300 bg-purple-50">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
+                <GitBranch className="w-4 h-4 text-purple-600" />
                 Selected Concept
               </h3>
               <div className="table-container">
-                <table className="table">
+                <table className="table compact-table">
                   <thead>
                     <tr>
-                      <th>Steps Away</th>
-                      <th>Concept Name</th>
-                      <th>ID</th>
-                      <th>Vocabulary</th>
-                      <th>Class</th>
-                      <th>Action</th>
+                      <th className="text-xs py-1.5">Steps</th>
+                      <th className="text-xs py-1.5">Concept Name</th>
+                      <th className="text-xs py-1.5">ID</th>
+                      <th className="text-xs py-1.5">Vocab</th>
+                      <th className="text-xs py-1.5">Class</th>
+                      <th className="text-xs py-1.5">Re-anchor</th>
+                      <th className="text-xs py-1.5">Action</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {self.map((result) => (
                       <tr key={result.hierarchy_concept_id}>
-                        <td>
-                          <span className="badge bg-purple-100 text-purple-800">
+                        <td className="py-1.5 px-2">
+                          <span className="badge bg-purple-100 text-purple-800 text-xs px-1.5 py-0.5">
                             {result.steps_away}
                           </span>
                         </td>
-                        <td className="font-medium">{result.concept_name}</td>
-                        <td className="text-sm">{result.hierarchy_concept_id}</td>
-                        <td>
-                          <span className="badge badge-primary">{result.vocabulary_id}</span>
+                        <td className="font-medium text-sm py-1.5 px-2">{result.concept_name}</td>
+                        <td className="text-xs py-1.5 px-2">{result.hierarchy_concept_id}</td>
+                        <td className="py-1.5 px-2">
+                          <span className="badge badge-primary text-xs px-1.5 py-0.5">{result.vocabulary_id}</span>
                         </td>
-                        <td className="text-xs text-gray-600">{result.concept_class_id}</td>
-                        <td>
+                        <td className="text-xs text-gray-600 py-1.5 px-2">{result.concept_class_id}</td>
+                        <td className="py-1.5 px-2">
+                          <button
+                            onClick={() => handleReAnchor(result.hierarchy_concept_id)}
+                            disabled={currentAnchorId === result.hierarchy_concept_id}
+                            className="btn-table flex items-center gap-1 text-xs py-0.5 px-1.5"
+                            title="Re-anchor hierarchy on this concept"
+                          >
+                            <RotateCw className="w-3 h-3" />
+                            {currentAnchorId === result.hierarchy_concept_id ? 'Current' : 'Re-anchor'}
+                          </button>
+                        </td>
+                        <td className="py-1.5 px-2">
                           <button
                             onClick={() => handleAddToCart(result)}
                             disabled={isAdded(result.hierarchy_concept_id)}
                             className={`
-                              btn-table flex items-center gap-1 text-xs
+                              btn-table flex items-center gap-1 text-xs py-0.5 px-1.5
                               ${isAdded(result.hierarchy_concept_id) ? 'bg-green-50 text-green-700 border-green-200' : ''}
                             `}
                           >
@@ -282,43 +354,55 @@ export default function Step2Hierarchy({
 
           {/* Children (Descendants) */}
           {children.length > 0 && (
-            <div className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <GitBranch className="w-5 h-5 text-green-600 transform rotate-180" />
+            <div className="card p-3">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
+                <GitBranch className="w-4 h-4 text-green-600 transform rotate-180" />
                 Descendants ({children.length})
               </h3>
               <div className="table-container">
-                <table className="table">
+                <table className="table compact-table">
                   <thead>
                     <tr>
-                      <th>Steps Away</th>
-                      <th>Concept Name</th>
-                      <th>ID</th>
-                      <th>Vocabulary</th>
-                      <th>Class</th>
-                      <th>Action</th>
+                      <th className="text-xs py-1.5">Steps</th>
+                      <th className="text-xs py-1.5">Concept Name</th>
+                      <th className="text-xs py-1.5">ID</th>
+                      <th className="text-xs py-1.5">Vocab</th>
+                      <th className="text-xs py-1.5">Class</th>
+                      <th className="text-xs py-1.5">Re-anchor</th>
+                      <th className="text-xs py-1.5">Action</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {children.map((result) => (
                       <tr key={result.hierarchy_concept_id}>
-                        <td>
-                          <span className="badge bg-green-100 text-green-800">
+                        <td className="py-1.5 px-2">
+                          <span className="badge bg-green-100 text-green-800 text-xs px-1.5 py-0.5">
                             {result.steps_away}
                           </span>
                         </td>
-                        <td className="font-medium">{result.concept_name}</td>
-                        <td className="text-sm">{result.hierarchy_concept_id}</td>
-                        <td>
-                          <span className="badge badge-primary">{result.vocabulary_id}</span>
+                        <td className="font-medium text-sm py-1.5 px-2">{result.concept_name}</td>
+                        <td className="text-xs py-1.5 px-2">{result.hierarchy_concept_id}</td>
+                        <td className="py-1.5 px-2">
+                          <span className="badge badge-primary text-xs px-1.5 py-0.5">{result.vocabulary_id}</span>
                         </td>
-                        <td className="text-xs text-gray-600">{result.concept_class_id}</td>
-                        <td>
+                        <td className="text-xs text-gray-600 py-1.5 px-2">{result.concept_class_id}</td>
+                        <td className="py-1.5 px-2">
+                          <button
+                            onClick={() => handleReAnchor(result.hierarchy_concept_id)}
+                            disabled={currentAnchorId === result.hierarchy_concept_id}
+                            className="btn-table flex items-center gap-1 text-xs py-0.5 px-1.5"
+                            title="Re-anchor hierarchy on this concept"
+                          >
+                            <RotateCw className="w-3 h-3" />
+                            {currentAnchorId === result.hierarchy_concept_id ? 'Current' : 'Re-anchor'}
+                          </button>
+                        </td>
+                        <td className="py-1.5 px-2">
                           <button
                             onClick={() => handleAddToCart(result)}
                             disabled={isAdded(result.hierarchy_concept_id)}
                             className={`
-                              btn-table flex items-center gap-1 text-xs
+                              btn-table flex items-center gap-1 text-xs py-0.5 px-1.5
                               ${isAdded(result.hierarchy_concept_id) ? 'bg-green-50 text-green-700 border-green-200' : ''}
                             `}
                           >

@@ -46,7 +46,7 @@
   }
 
   .card {
-    @apply bg-white rounded-lg shadow-md p-4;
+    @apply bg-white rounded-lg shadow-md p-6;
   }
 
   .table-container {
@@ -75,6 +75,15 @@
 
   .table tbody tr.selected {
     @apply bg-primary-50;
+  }
+
+  /* Compact table variant for space optimization */
+  .compact-table th {
+    @apply px-2 py-1.5;
+  }
+
+  .compact-table td {
+    @apply px-2 py-1.5;
   }
 
   .badge {

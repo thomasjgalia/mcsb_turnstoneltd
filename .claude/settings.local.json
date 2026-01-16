@@ -5,7 +5,9 @@
       "Bash(npm install:*)",
       "Bash(vercel:*)",
       "Bash(printf:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npm run dev:*)"
     ]
   }
 }

@@ -141,16 +141,16 @@ export default function Step3CodeSet({
 
   if (shoppingCart.length === 0) {
     return (
-      <div className="card text-center py-12">
-        <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
+      <div className="card p-6 text-center">
+        <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+        <h3 className="text-sm font-medium text-gray-900 mb-1">
           Shopping Cart is Empty
         </h3>
-        <p className="text-gray-500 mb-4">
-          Add concepts to your cart from Step 2 before building a code set
+        <p className="text-xs text-gray-500 mb-3">
+          Add concepts from Step 2
         </p>
-        <button onClick={onBackToHierarchy} className="btn-primary">
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <button onClick={onBackToHierarchy} className="btn-primary text-sm px-3 py-1.5">
+          <ArrowLeft className="w-3 h-3 mr-1.5" />
           Back to Hierarchy
         </button>
       </div>
@@ -158,45 +158,37 @@ export default function Step3CodeSet({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Step Title */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Step 3: Build Code Set</h2>
-        <p className="text-gray-600 mt-1">
-          Generate comprehensive code sets from all concepts in your cart
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {/* Cart Summary */}
-      <div className="card bg-primary-50 border-primary-200">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+      <div className="card p-4 bg-primary-50 border-primary-200">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1.5">
               Building from {shoppingCart.length} concept{shoppingCart.length !== 1 ? 's' : ''}
             </h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {shoppingCart.map((item) => (
-                <span key={item.hierarchy_concept_id} className="badge badge-primary">
-                  {item.concept_name.slice(0, 30)}
-                  {item.concept_name.length > 30 ? '...' : ''}
+                <span key={item.hierarchy_concept_id} className="badge badge-primary text-xs px-2 py-0.5">
+                  {item.concept_name.slice(0, 25)}
+                  {item.concept_name.length > 25 ? '...' : ''}
                 </span>
               ))}
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              <button onClick={onBackToHierarchy} className="btn-secondary flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back to Hierarchy
+          <div className="flex flex-col gap-1.5">
+            <div className="flex gap-1.5">
+              <button onClick={onBackToHierarchy} className="btn-secondary flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap">
+                <ArrowLeft className="w-3 h-3" />
+                Back
               </button>
-              <button onClick={onBackToSearch} className="btn-secondary flex items-center gap-2">
-                <Plus className="w-4 h-4" />
-                Add More Concepts
+              <button onClick={onBackToSearch} className="btn-secondary flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap">
+                <Plus className="w-3 h-3" />
+                Add More
               </button>
             </div>
-            <button onClick={onStartOver} className="btn-secondary flex items-center gap-2 text-red-600 hover:text-red-700">
-              <RotateCcw className="w-4 h-4" />
-              Start Over (Clear Cart)
+            <button onClick={onStartOver} className="btn-secondary flex items-center gap-1.5 text-xs px-3 py-1.5 text-red-600 hover:text-red-700 whitespace-nowrap">
+              <RotateCcw className="w-3 h-3" />
+              Clear Cart
             </button>
           </div>
         </div>
@@ -204,27 +196,27 @@ export default function Step3CodeSet({
 
       {/* Build Code Set Button */}
       {!hasBuilt && !loading && (
-        <div className="card text-center py-6">
-          <PackageCheck className="w-12 h-12 text-primary-600 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <div className="card p-4 text-center">
+          <PackageCheck className="w-10 h-10 text-primary-600 mx-auto mb-2" />
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">
             Ready to Build Code Set
           </h3>
-          <p className="text-gray-600 mb-4">
-            Click the button below to generate your code set from {shoppingCart.length} selected concept{shoppingCart.length !== 1 ? 's' : ''}
+          <p className="text-xs text-gray-600 mb-3">
+            Generate from {shoppingCart.length} selected concept{shoppingCart.length !== 1 ? 's' : ''}
           </p>
 
           {/* Combo Filter (Drug domain only) */}
           {shoppingCart.some((item) => item.domain_id === 'Drug') && (
-            <div className="mb-6 flex justify-center">
+            <div className="mb-3 flex justify-center">
               <div className="inline-flex flex-col items-start">
-                <label htmlFor="comboFilter" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="comboFilter" className="block text-xs font-medium text-gray-700 mb-1">
                   Drug Filter (optional)
                 </label>
                 <select
                   id="comboFilter"
                   value={comboFilter}
                   onChange={(e) => setComboFilter(e.target.value as ComboFilter)}
-                  className="select-field max-w-xs"
+                  className="select-field text-sm max-w-xs"
                   disabled={loading}
                 >
                   <option value="ALL">All Drugs</option>
@@ -235,8 +227,8 @@ export default function Step3CodeSet({
             </div>
           )}
 
-          <button onClick={buildSet} className="btn-primary flex items-center gap-2 mx-auto px-8 py-3 text-lg">
-            <PackageCheck className="w-6 h-6" />
+          <button onClick={buildSet} className="btn-primary flex items-center gap-2 mx-auto px-6 py-2 text-sm">
+            <PackageCheck className="w-4 h-4" />
             Build Code Set
           </button>
         </div>
@@ -244,23 +236,23 @@ export default function Step3CodeSet({
 
       {/* Rebuild Button (shown after initial build) */}
       {hasBuilt && !loading && shoppingCart.some((item) => item.domain_id === 'Drug') && (
-        <div className="card">
-          <label htmlFor="comboFilter" className="block text-sm font-medium text-gray-700 mb-2">
-            Drug Filter (Drug domain only)
+        <div className="card p-3">
+          <label htmlFor="comboFilter" className="block text-xs font-medium text-gray-700 mb-1.5">
+            Drug Filter
           </label>
           <div className="flex gap-2">
             <select
               id="comboFilter"
               value={comboFilter}
               onChange={(e) => setComboFilter(e.target.value as ComboFilter)}
-              className="select-field max-w-xs"
+              className="select-field text-sm max-w-xs"
               disabled={loading}
             >
               <option value="ALL">All Drugs</option>
               <option value="SINGLE">Single Ingredient Only</option>
               <option value="COMBINATION">Combination Drugs Only</option>
             </select>
-            <button onClick={buildSet} className="btn-primary" disabled={loading}>
+            <button onClick={buildSet} className="btn-primary text-sm px-4 py-2" disabled={loading}>
               Rebuild
             </button>
           </div>
@@ -269,17 +261,17 @@ export default function Step3CodeSet({
 
       {/* Loading State */}
       {loading && (
-        <div className="card text-center py-12">
-          <Loader2 className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Building code set...</p>
+        <div className="card p-6 text-center">
+          <Loader2 className="w-10 h-10 text-primary-600 animate-spin mx-auto mb-2" />
+          <p className="text-xs text-gray-600">Building code set...</p>
         </div>
       )}
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-800">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-red-800">{error}</p>
         </div>
       )}
 
@@ -288,28 +280,28 @@ export default function Step3CodeSet({
         <>
           {/* Vocabulary Filter */}
           {availableVocabularies.length > 1 && (
-            <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+            <div className="card p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-900">
                   Filter by Vocabulary
                 </h3>
                 <div className="flex gap-2">
                   <button
                     onClick={selectAllVocabularies}
-                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
                   >
                     Select All
                   </button>
                   <span className="text-gray-300">|</span>
                   <button
                     onClick={clearAllVocabularies}
-                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
                   >
                     Clear All
                   </button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {availableVocabularies.map((vocab) => {
                   const count = results.filter((r) => r.child_vocabulary_id === vocab).length;
                   const isSelected = selectedVocabularies.has(vocab);
@@ -318,7 +310,7 @@ export default function Step3CodeSet({
                       key={vocab}
                       onClick={() => toggleVocabulary(vocab)}
                       className={`
-                        px-3 py-2 rounded-lg border text-sm font-medium transition-colors
+                        px-2 py-1 rounded-lg border text-xs font-medium transition-colors
                         ${
                           isSelected
                             ? 'bg-primary-100 border-primary-300 text-primary-700'
@@ -331,7 +323,7 @@ export default function Step3CodeSet({
                   );
                 })}
               </div>
-              <p className="mt-3 text-sm text-gray-500">
+              <p className="mt-2 text-xs text-gray-500">
                 {selectedVocabularies.size === 0
                   ? `Showing all ${visibleResults.length} codes from ${availableVocabularies.length} vocabularies`
                   : `Showing ${visibleResults.length} of ${results.length} codes from ${selectedVocabularies.size} selected ${selectedVocabularies.size === 1 ? 'vocabulary' : 'vocabularies'}`}
@@ -340,38 +332,38 @@ export default function Step3CodeSet({
           )}
 
           {/* Export Buttons */}
-          <div className="card">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+          <div className="card p-3">
+            <div className="mb-2">
+              <h3 className="text-sm font-semibold text-gray-900">
                 Export Code Set ({filteredResults.length} codes)
               </h3>
               {excludedCodes.size > 0 && (
-                <p className="text-sm text-gray-600 mt-1">
-                  {excludedCodes.size} code{excludedCodes.size !== 1 ? 's' : ''} excluded from export
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {excludedCodes.size} code{excludedCodes.size !== 1 ? 's' : ''} excluded
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap gap-3">
-              <button onClick={handleExportTxt} className="btn-primary flex items-center gap-2">
-                <Download className="w-5 h-5" />
+            <div className="flex flex-wrap gap-2">
+              <button onClick={handleExportTxt} className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5">
+                <Download className="w-4 h-4" />
                 Export as TXT
               </button>
               <button
                 onClick={handleCopySql}
                 className={`
-                  btn-secondary flex items-center gap-2
+                  btn-secondary flex items-center gap-1.5 text-sm px-3 py-1.5
                   ${sqlCopied ? 'bg-green-50 text-green-700 border-green-200' : ''}
                 `}
               >
                 {sqlCopied ? (
                   <>
-                    <CheckCircle className="w-5 h-5" />
-                    Copied to Clipboard!
+                    <CheckCircle className="w-4 h-4" />
+                    Copied!
                   </>
                 ) : (
                   <>
-                    <Copy className="w-5 h-5" />
-                    Copy SQL Snippet
+                    <Copy className="w-4 h-4" />
+                    Copy SQL
                   </>
                 )}
               </button>
@@ -385,24 +377,24 @@ export default function Step3CodeSet({
             const excludedCount = vocabResults.length - includedCount;
 
             return (
-              <div key={vocabulary} className="card">
+              <div key={vocabulary} className="card p-3">
                 <div
-                  className="flex items-center justify-between mb-4 cursor-pointer hover:bg-gray-50 -m-6 p-6 rounded-t-lg"
+                  className="flex items-center justify-between mb-2 cursor-pointer hover:bg-gray-50 -m-3 p-3 rounded-t-lg"
                   onClick={() => toggleVocabCollapse(vocabulary)}
                 >
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
                     {isCollapsed ? (
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
                     ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
                     )}
-                    <span className="badge badge-primary">{vocabulary}</span>
-                    <span className="text-sm font-normal text-gray-500">
+                    <span className="badge badge-primary text-xs px-2 py-0.5">{vocabulary}</span>
+                    <span className="text-xs font-normal text-gray-500">
                       ({vocabResults.length} codes)
                     </span>
                   </h3>
                   {excludedCount > 0 && (
-                    <span className="text-sm text-gray-600">
+                    <span className="text-xs text-gray-600">
                       {excludedCount} excluded
                     </span>
                   )}
@@ -410,17 +402,17 @@ export default function Step3CodeSet({
 
                 {!isCollapsed && (
                   <div className="table-container">
-                <table className="table">
+                <table className="table compact-table">
                   <thead>
                     <tr>
-                      <th className="w-12"></th>
-                      <th>Code</th>
-                      <th>Name</th>
-                      <th>Concept ID</th>
-                      <th>Class</th>
-                      {vocabResults[0]?.combinationyesno && <th>Combo</th>}
-                      {vocabResults[0]?.dose_form && <th>Dose Form</th>}
-                      {vocabResults[0]?.dfg_name && <th>DFG Category</th>}
+                      <th className="w-12 text-xs py-1.5"></th>
+                      <th className="text-xs py-1.5">Code</th>
+                      <th className="text-xs py-1.5">Name</th>
+                      <th className="text-xs py-1.5">Concept ID</th>
+                      <th className="text-xs py-1.5">Class</th>
+                      {vocabResults[0]?.combinationyesno && <th className="text-xs py-1.5">Combo</th>}
+                      {vocabResults[0]?.dose_form && <th className="text-xs py-1.5">Dose Form</th>}
+                      {vocabResults[0]?.dfg_name && <th className="text-xs py-1.5">DFG Category</th>}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -431,7 +423,7 @@ export default function Step3CodeSet({
                           key={`${result.child_concept_id}-${index}`}
                           className={isExcluded ? 'bg-gray-50 opacity-60' : ''}
                         >
-                          <td>
+                          <td className="py-1.5 px-2">
                             <input
                               type="checkbox"
                               checked={!isExcluded}
@@ -440,14 +432,14 @@ export default function Step3CodeSet({
                               title={isExcluded ? "Include in export" : "Exclude from export"}
                             />
                           </td>
-                          <td className="font-mono text-sm">{result.child_code}</td>
-                          <td className="font-medium">{result.child_name}</td>
-                          <td className="text-sm">{result.child_concept_id}</td>
-                          <td className="text-xs text-gray-600">{result.concept_class_id}</td>
+                          <td className="font-mono text-xs py-1.5 px-2">{result.child_code}</td>
+                          <td className="font-medium text-sm py-1.5 px-2">{result.child_name}</td>
+                          <td className="text-xs py-1.5 px-2">{result.child_concept_id}</td>
+                          <td className="text-xs text-gray-600 py-1.5 px-2">{result.concept_class_id}</td>
                         {result.combinationyesno && (
-                          <td>
+                          <td className="py-1.5 px-2">
                             <span
-                              className={`badge ${
+                              className={`badge text-xs px-1.5 py-0.5 ${
                                 result.combinationyesno === 'COMBINATION'
                                   ? 'badge-warning'
                                   : 'badge-success'
@@ -458,11 +450,11 @@ export default function Step3CodeSet({
                           </td>
                         )}
                         {result.dose_form && (
-                          <td className="text-xs text-gray-600">{result.dose_form}</td>
+                          <td className="text-xs text-gray-600 py-1.5 px-2">{result.dose_form}</td>
                         )}
                         {result.dfg_name && (
-                          <td>
-                            <span className="badge badge-info text-xs">
+                          <td className="py-1.5 px-2">
+                            <span className="badge badge-info text-xs px-1.5 py-0.5">
                               {result.dfg_name}
                             </span>
                           </td>

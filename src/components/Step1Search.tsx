@@ -18,6 +18,8 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [selectedVocabulary, setSelectedVocabulary] = useState<string>('');
+  const [selectedConceptClass, setSelectedConceptClass] = useState<string>('');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +38,8 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
     setError(null);
     setResults([]);
     setSelectedRow(null);
+    setSelectedVocabulary('');
+    setSelectedConceptClass('');
 
     try {
       const data = await searchConcepts({
@@ -66,31 +70,49 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
     onConceptSelected(result, domain as DomainType);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Step Title */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Step 1: Search Concepts</h2>
-        <p className="text-gray-600 mt-1">
-          Search for medical concepts across OMOP vocabularies
-        </p>
-      </div>
+  // Get unique vocabularies and concept classes from results
+  const availableVocabularies = Array.from(
+    new Set(results.map((r) => r.searched_vocabulary))
+  ).sort();
 
-      {/* Search Form */}
-      <form onSubmit={handleSearch} className="card">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  const availableConceptClasses = Array.from(
+    new Set(results.map((r) => r.searched_concept_class_id))
+  ).sort();
+
+  // Filter results based on selections
+  const filteredResults = results.filter((result) => {
+    if (selectedVocabulary && result.searched_vocabulary !== selectedVocabulary) {
+      return false;
+    }
+    if (selectedConceptClass && result.searched_concept_class_id !== selectedConceptClass) {
+      return false;
+    }
+    return true;
+  });
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedVocabulary('');
+    setSelectedConceptClass('');
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Compact Search Form */}
+      <form onSubmit={handleSearch} className="card p-4">
+        <div className="flex items-end gap-3">
           {/* Search Term */}
-          <div className="md:col-span-2">
-            <label htmlFor="searchTerm" className="block text-sm font-medium text-gray-700 mb-2">
-              Search Term
+          <div className="flex-1">
+            <label htmlFor="searchTerm" className="block text-xs font-medium text-gray-700 mb-1">
+              Search medical concepts
             </label>
             <input
               id="searchTerm"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Enter medical term (e.g., ritonavir, diabetes)"
-              className="input-field"
+              placeholder="e.g., ritonavir, diabetes"
+              className="input-field text-sm"
               disabled={loading}
               required
               minLength={2}
@@ -98,19 +120,19 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
           </div>
 
           {/* Domain */}
-          <div>
-            <label htmlFor="domain" className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="w-48">
+            <label htmlFor="domain" className="block text-xs font-medium text-gray-700 mb-1">
               Domain <span className="text-red-600">*</span>
             </label>
             <select
               id="domain"
               value={domain}
               onChange={(e) => setDomain(e.target.value as DomainType | '')}
-              className="select-field"
+              className="select-field text-sm"
               disabled={loading}
               required
             >
-              <option value="">-- Select Domain --</option>
+              <option value="">Select...</option>
               {DOMAINS.map((d) => (
                 <option key={d} value={d}>
                   {d}
@@ -118,45 +140,93 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
               ))}
             </select>
           </div>
-        </div>
 
-        <button
-          type="submit"
-          disabled={loading || searchTerm.trim().length < 2 || !domain}
-          className="btn-primary mt-4 flex items-center gap-2"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Searching...
-            </>
-          ) : (
-            <>
-              <Search className="w-5 h-5" />
-              Search
-            </>
-          )}
-        </button>
+          <button
+            type="submit"
+            disabled={loading || searchTerm.trim().length < 2 || !domain}
+            className="btn-primary flex items-center gap-2 text-sm px-4 py-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Searching...
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4" />
+                Search
+              </>
+            )}
+          </button>
+        </div>
       </form>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-800">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-red-800">{error}</p>
         </div>
       )}
 
       {/* Results Table */}
       {results.length > 0 && (
-        <div className="card">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Search Results ({results.length})
-            </h3>
-            <p className="text-sm text-blue-600 font-medium flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              Click any row to select it and proceed to Step 2 (Hierarchy)
+        <div className="card p-4">
+          <div className="flex items-center justify-between gap-4 mb-3">
+            <div className="flex items-center gap-3 flex-1">
+              <h3 className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                Results: {filteredResults.length}{filteredResults.length !== results.length && ` / ${results.length}`}
+              </h3>
+
+              {/* Inline Filters */}
+              {results.length > 1 && (
+                <>
+                  <select
+                    value={selectedVocabulary}
+                    onChange={(e) => setSelectedVocabulary(e.target.value)}
+                    className="select-field text-xs py-1 px-2"
+                  >
+                    <option value="">Vocab: All ({availableVocabularies.length})</option>
+                    {availableVocabularies.map((vocab) => {
+                      const count = results.filter((r) => r.searched_vocabulary === vocab).length;
+                      return (
+                        <option key={vocab} value={vocab}>
+                          {vocab} ({count})
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <select
+                    value={selectedConceptClass}
+                    onChange={(e) => setSelectedConceptClass(e.target.value)}
+                    className="select-field text-xs py-1 px-2"
+                  >
+                    <option value="">Class: All ({availableConceptClasses.length})</option>
+                    {availableConceptClasses.map((conceptClass) => {
+                      const count = results.filter((r) => r.searched_concept_class_id === conceptClass).length;
+                      return (
+                        <option key={conceptClass} value={conceptClass}>
+                          {conceptClass} ({count})
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  {(selectedVocabulary || selectedConceptClass) && (
+                    <button
+                      onClick={clearFilters}
+                      className="text-xs text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              Click row for hierarchy
             </p>
           </div>
 
@@ -174,7 +244,7 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {results.map((result, index) => (
+                {filteredResults.map((result, index) => (
                   <tr
                     key={`${result.std_concept_id}-${index}`}
                     onClick={() => handleRowClick(index, result)}
@@ -201,13 +271,10 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
 
       {/* Empty State */}
       {!loading && results.length === 0 && !error && (
-        <div className="card text-center py-12">
-          <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Ready to Search
-          </h3>
-          <p className="text-gray-500">
-            Enter a medical term and select a domain to begin
+        <div className="card p-8 text-center">
+          <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">
+            Enter a medical term and select a domain to search
           </p>
         </div>
       )}
