@@ -160,13 +160,13 @@ export default function Step3CodeSet({
   return (
     <div className="space-y-4">
       {/* Cart Summary */}
-      <div className="card p-4 bg-primary-50 border-primary-200">
-        <div className="flex items-center justify-between gap-4">
+      <div className="card p-2 bg-primary-50 border-primary-200">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-gray-900 mb-1.5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-0.5">
               Building from {shoppingCart.length} concept{shoppingCart.length !== 1 ? 's' : ''}
             </h3>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {shoppingCart.map((item) => (
                 <span key={item.hierarchy_concept_id} className="badge badge-primary text-xs px-2 py-0.5">
                   {item.concept_name.slice(0, 25)}
@@ -175,8 +175,8 @@ export default function Step3CodeSet({
               ))}
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <div className="flex gap-1.5">
+          <div className="flex flex-col gap-1">
+            <div className="flex gap-1">
               <button onClick={onBackToHierarchy} className="btn-secondary flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap">
                 <ArrowLeft className="w-3 h-3" />
                 Back

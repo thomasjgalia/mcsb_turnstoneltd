@@ -99,7 +99,7 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
   return (
     <div className="space-y-4">
       {/* Compact Search Form */}
-      <form onSubmit={handleSearch} className="card p-4">
+      <form onSubmit={handleSearch} className="card p-3">
         <div className="flex items-end gap-3">
           {/* Search Term */}
           <div className="flex-1">
