@@ -21,7 +21,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 seconds
+  timeout: 95000, // 95 seconds (allows for 90s backend timeout + 5s buffer)
 });
 
 // ============================================================================
@@ -38,6 +38,22 @@ const handleApiError = (error: unknown): never => {
     throw new Error(message);
   }
   throw error;
+};
+
+// ============================================================================
+// Health Check / Database Warmup
+// ============================================================================
+export const checkHealth = async (): Promise<{
+  success: boolean;
+  duration_ms?: number;
+  message?: string;
+}> => {
+  try {
+    const response = await apiClient.get('/api/health');
+    return response.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
 };
 
 // ============================================================================

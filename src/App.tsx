@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
+import { checkHealth } from './lib/api';
 import type { User } from '@supabase/supabase-js';
 import type { CartItem, SearchResult, DomainType } from './lib/types';
 
@@ -16,6 +17,8 @@ function AppContent() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dbWarming, setDbWarming] = useState(false);
+  const [dbReady, setDbReady] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [shoppingCart, setShoppingCart] = useState<CartItem[]>([]);
   const [selectedConcept, setSelectedConcept] = useState<SearchResult | null>(null);
@@ -48,6 +51,24 @@ function AppContent() {
 
     return () => subscription.unsubscribe();
   }, [authDisabled]);
+
+  // Warm up database connection after user is authenticated
+  useEffect(() => {
+    if (user && !dbReady && !dbWarming) {
+      setDbWarming(true);
+      checkHealth()
+        .then((result) => {
+          console.log('Database warmup successful:', result);
+          setDbReady(true);
+          setDbWarming(false);
+        })
+        .catch((error) => {
+          console.error('Database warmup failed:', error);
+          setDbWarming(false);
+          // Don't block the UI, just log the error
+        });
+    }
+  }, [user, dbReady, dbWarming]);
 
   // Shopping cart functions
   const addToCart = (item: CartItem) => {
@@ -87,6 +108,26 @@ function AppContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show database warming message
+  if (user && dbWarming) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <h2 className="mt-4 text-xl font-semibold text-gray-900">
+            Connecting to Azure SQL Server
+          </h2>
+          <p className="mt-2 text-gray-600">
+            Please wait while we establish a connection with the database...
+          </p>
+          <p className="mt-2 text-sm text-gray-500">
+            This may take up to a minute if the database was paused.
+          </p>
         </div>
       </div>
     );
@@ -209,7 +250,7 @@ function AppContent() {
         <footer className="bg-white border-t border-gray-200 mt-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <p className="text-center text-sm text-gray-500">
-              Medical Code Set Builder - Oracle Cloud Edition | Built with React + Oracle + Supabase
+              Medical Code Set Builder | Built with React + Azure SQL Server + Supabase
             </p>
           </div>
         </footer>
