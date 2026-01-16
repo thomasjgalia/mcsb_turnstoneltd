@@ -42,6 +42,8 @@ You work only with these OMOP vocabularies and domains:
 
 IMPORTANT: When identifying medical codes, ALWAYS specify which OMOP domain they belong to (Condition, Drug, Procedure, Measurement, or Observation).
 
+Whenever possible, include medical code(s)/domain(s) in your response.
+
 When input is unclear, ask focused clarifying questions ONLY about medical terminology.
 Keep responses concise, neutral, and domain‑specific.`;
 
