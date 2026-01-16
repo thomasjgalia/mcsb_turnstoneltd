@@ -13,11 +13,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy API requests to deployed Vercel app during local development
+      // Proxy API requests to local dev server during development
       '/api': {
-        target: 'https://mcsb-oracle.vercel.app',
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        secure: true,
+        secure: false,
       },
     },
   },

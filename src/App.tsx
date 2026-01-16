@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabase';
-import { checkHealth } from './lib/api';
+import { checkHealth, upsertUserProfile } from './lib/api';
 import type { User } from '@supabase/supabase-js';
 import type { CartItem, SearchResult, DomainType } from './lib/types';
 
@@ -11,12 +11,14 @@ import ShoppingCart from './components/ShoppingCart';
 import Step1Search from './components/Step1Search';
 import Step2Hierarchy from './components/Step2Hierarchy';
 import Step3CodeSet from './components/Step3CodeSet';
+import SavedCodeSets from './components/SavedCodeSets';
 import AuthPage from './components/AuthPage';
 import DirectionsModal from './components/DirectionsModal';
 import PendingApprovalPage from './components/PendingApprovalPage';
 
 function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [dbWarming, setDbWarming] = useState(false);
@@ -43,6 +45,15 @@ function AppContent() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Create/update user profile on login
+      if (session?.user) {
+        upsertUserProfile(
+          session.user.id,
+          session.user.email!,
+          session.user.user_metadata?.display_name
+        ).catch(err => console.error('Failed to create user profile:', err));
+      }
     });
 
     // Listen for auth changes
@@ -50,6 +61,15 @@ function AppContent() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+
+      // Create/update user profile on auth state change
+      if (session?.user) {
+        upsertUserProfile(
+          session.user.id,
+          session.user.email!,
+          session.user.user_metadata?.display_name
+        ).catch(err => console.error('Failed to create user profile:', err));
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -74,6 +94,19 @@ function AppContent() {
         });
     }
   }, [user, dbReady, dbWarming]);
+
+  // Handle loading cart items from navigation state (for edit functionality)
+  useEffect(() => {
+    const state = location.state as { cartItems?: CartItem[]; autoRebuild?: boolean } | null;
+    if (state?.cartItems && state.cartItems.length > 0) {
+      console.log('Loading cart items from navigation state:', state.cartItems);
+      setShoppingCart(state.cartItems);
+      setCurrentStep(3);
+
+      // Clear the navigation state to prevent reloading on page refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   // Shopping cart functions
   const addToCart = (item: CartItem) => {
@@ -164,6 +197,12 @@ function AppContent() {
               </div>
               <div className="flex items-center gap-3">
                 <button
+                  onClick={() => navigate('/saved')}
+                  className="btn-secondary text-xs px-3 py-1.5"
+                >
+                  My Saved Code Sets
+                </button>
+                <button
                   onClick={() => setIsDirectionsOpen(true)}
                   className="btn-secondary text-xs px-3 py-1.5"
                 >
@@ -249,6 +288,10 @@ function AppContent() {
                       currentStep={currentStep}
                     />
                   }
+                />
+                <Route
+                  path="/saved"
+                  element={<SavedCodeSets />}
                 />
               </Routes>
           </div>

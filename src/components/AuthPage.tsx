@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, CheckCircle, Lock, Eye, EyeOff } from 'lucide-react';
 
-type AuthMode = 'signin' | 'signup' | 'magic-link';
+type AuthMode = 'signin' | 'signup';
 
 export default function AuthPage() {
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
@@ -20,21 +20,7 @@ export default function AuthPage() {
     setError(null);
 
     try {
-      if (authMode === 'magic-link') {
-        // Magic link authentication
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo: window.location.origin,
-          },
-        });
-
-        if (error) {
-          setError(error.message);
-        } else {
-          setEmailSent(true);
-        }
-      } else if (authMode === 'signup') {
+      if (authMode === 'signup') {
         // Sign up with email and password
         if (password !== confirmPassword) {
           setError('Passwords do not match');
@@ -103,12 +89,10 @@ export default function AuthPage() {
               Check Your Email
             </h2>
             <p className="text-center text-gray-600 mb-6">
-              We've sent {authMode === 'magic-link' ? 'a magic link' : 'a confirmation email'} to <strong>{email}</strong>
+              We've sent a confirmation email to <strong>{email}</strong>
             </p>
             <p className="text-sm text-center text-gray-500">
-              {authMode === 'magic-link'
-                ? 'Click the link in the email to sign in. You can close this window.'
-                : 'Click the link in the email to confirm your account. After confirmation, you can sign in.'}
+              Click the link in the email to confirm your account. After confirmation, you can sign in.
             </p>
             <button
               onClick={resetForm}
@@ -135,7 +119,7 @@ export default function AuthPage() {
             </p>
           </div>
 
-          {/* Auth Mode Tabs */}
+          {/* Mode toggle */}
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => {
@@ -188,41 +172,39 @@ export default function AuthPage() {
               </div>
             </div>
 
-            {/* Password Field (only for signin/signup) */}
-            {authMode !== 'magic-link' && (
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    required
-                    minLength={6}
-                    className="input-field pl-10 pr-10"
-                    disabled={loading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                    ) : (
-                      <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                    )}
-                  </button>
+            {/* Password Field */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
                 </div>
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  minLength={6}
+                  className="input-field pl-10 pr-10"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  )}
+                </button>
               </div>
-            )}
+            </div>
 
             {/* Confirm Password Field (only for signup) */}
             {authMode === 'signup' && (
@@ -263,23 +245,18 @@ export default function AuthPage() {
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  {authMode === 'magic-link' ? 'Sending...' : authMode === 'signup' ? 'Signing Up...' : 'Signing In...'}
+                  {authMode === 'signup' ? 'Signing Up...' : 'Signing In...'}
                 </>
               ) : (
                 <>
-                  {authMode === 'magic-link' ? (
-                    <>
-                      <Mail className="w-5 h-5" />
-                      Send Magic Link
-                    </>
-                  ) : authMode === 'signup' ? (
+                  {authMode === 'signup' ? (
                     <>
                       <Lock className="w-5 h-5" />
                       Create Account
                     </>
                   ) : (
                     <>
-                      <Lock className="w-5 h-5" />
+                      <Lock className="w-5 w-5" />
                       Sign In
                     </>
                   )}
@@ -288,35 +265,9 @@ export default function AuthPage() {
             </button>
           </form>
 
-          {/* Magic Link Option */}
-          {authMode !== 'magic-link' && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or</span>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setAuthMode('magic-link');
-                  resetForm();
-                }}
-                className="btn-secondary w-full mt-4 flex items-center justify-center gap-2"
-              >
-                <Mail className="w-4 h-4" />
-                Sign in with Magic Link
-              </button>
-            </div>
-          )}
-
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
-              {authMode === 'magic-link'
-                ? "We'll email you a magic link for a password-free sign in."
-                : authMode === 'signup'
+              {authMode === 'signup'
                 ? '@veradigm.me emails are auto-approved. Others require manual approval.'
                 : 'Sign in to access the Medical Code Set Builder.'}
             </p>

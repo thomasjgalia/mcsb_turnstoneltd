@@ -107,29 +107,71 @@ export interface ApiError {
 }
 
 // ============================================================================
-// Supabase User Data Types
+// Azure SQL User Data Types
 // ============================================================================
-export interface UserPreferences {
-  user_id: string;
-  default_domain?: DomainType;
-  theme?: 'light' | 'dark';
+export interface UserProfile {
+  supabase_user_id: string;
+  email: string;
+  display_name?: string;
+  preferences?: string; // JSON string
+  created_at: string;
   updated_at: string;
 }
 
-export interface SavedCodeSet {
-  id: string;
-  user_id: string;
-  name: string;
-  hierarchy_concept_ids: number[];
-  created_at: string;
+export interface UserPreferences {
+  default_domain?: DomainType;
+  theme?: 'light' | 'dark';
+  show_search_history?: boolean;
+  recent_search_limit?: number;
 }
 
-export interface SearchHistory {
-  id: string;
-  user_id: string;
-  search_term: string;
-  domain: DomainType;
+export interface SavedCodeSetRecord {
+  id: number;
+  supabase_user_id: string;
+  code_set_name: string;
+  description?: string;
+  concepts: string; // JSON string
+  total_concepts: number;
   created_at: string;
+  updated_at: string;
+}
+
+export interface SavedCodeSetConcept {
+  hierarchy_concept_id: number;
+  concept_name: string;
+  vocabulary_id: string;
+  concept_class_id: string;
+  root_term: string;
+  domain_id: DomainType;
+}
+
+export interface SearchHistoryRecord {
+  id: number;
+  supabase_user_id: string;
+  search_term: string;
+  domain_type?: string;
+  result_count?: number;
+  searched_at: string;
+}
+
+// Request/Response types for user data API
+export interface SaveCodeSetRequest {
+  code_set_name: string;
+  description?: string;
+  concepts: SavedCodeSetConcept[];
+}
+
+export interface GetCodeSetsResponse {
+  id: number;
+  code_set_name: string;
+  description?: string;
+  total_concepts: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GetCodeSetDetailResponse extends GetCodeSetsResponse {
+  concepts: SavedCodeSetConcept[];
 }
 
 // ============================================================================

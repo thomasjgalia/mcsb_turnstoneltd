@@ -20,6 +20,10 @@ app.use(express.json());
 import searchHandler from './api/search.js';
 import hierarchyHandler from './api/hierarchy.js';
 import codesetHandler from './api/codeset.js';
+import chatHandler from './api/chat.js';
+import profileHandler from './api/user/profile.js';
+import codesetsHandler from './api/user/codesets.js';
+import searchHistoryHandler from './api/user/search-history.js';
 
 // Wrapper to convert Vercel handlers to Express handlers
 const vercelToExpress = (handler: any) => {
@@ -61,6 +65,17 @@ const vercelToExpress = (handler: any) => {
 app.post('/api/search', vercelToExpress(searchHandler));
 app.post('/api/hierarchy', vercelToExpress(hierarchyHandler));
 app.post('/api/codeset', vercelToExpress(codesetHandler));
+app.post('/api/chat', vercelToExpress(chatHandler));
+
+// User API Routes
+app.post('/api/user/profile', vercelToExpress(profileHandler));
+app.get('/api/user/profile/:userId', vercelToExpress(profileHandler));
+app.post('/api/user/codesets', vercelToExpress(codesetsHandler));
+app.get('/api/user/codesets/:userId', vercelToExpress(codesetsHandler));
+app.get('/api/user/codesets/detail/:codeSetId', vercelToExpress(codesetsHandler));
+app.delete('/api/user/codesets/:codeSetId', vercelToExpress(codesetsHandler));
+app.post('/api/user/search-history', vercelToExpress(searchHistoryHandler));
+app.get('/api/user/search-history/:userId', vercelToExpress(searchHistoryHandler));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -72,10 +87,12 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Development API server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health\n`);
   console.log('Environment variables loaded:');
-  console.log('  ORACLE_USER:', process.env.ORACLE_USER);
-  console.log('  ORACLE_PASSWORD:', process.env.ORACLE_PASSWORD ? '✓ Set' : '✗ Not set');
-  console.log('  ORACLE_CONNECTION_STRING:', process.env.ORACLE_CONNECTION_STRING);
-  console.log('  ORACLE_WALLET_LOCATION:', process.env.ORACLE_WALLET_LOCATION);
-  console.log('  ORACLE_WALLET_PASSWORD:', process.env.ORACLE_WALLET_PASSWORD ? '✓ Set' : '✗ Not set');
+  console.log('  AZURE_SQL_SERVER:', process.env.AZURE_SQL_SERVER);
+  console.log('  AZURE_SQL_DATABASE:', process.env.AZURE_SQL_DATABASE);
+  console.log('  AZURE_SQL_USER:', process.env.AZURE_SQL_USER);
+  console.log('  AZURE_SQL_PASSWORD:', process.env.AZURE_SQL_PASSWORD ? '✓ Set' : '✗ Not set');
+  console.log('  AZURE_SQL_CONNECTION_STRING:', process.env.AZURE_SQL_CONNECTION_STRING ? '✓ Set' : '✗ Not set');
+  console.log('  SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✓ Set' : '✗ Not set');
+  console.log('  OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✓ Set' : '✗ Not set');
   console.log('\n');
 });

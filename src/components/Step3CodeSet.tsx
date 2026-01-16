@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { PackageCheck, Loader2, AlertCircle, Download, Copy, CheckCircle, RotateCcw, ArrowLeft, Plus, ChevronDown, ChevronRight } from 'lucide-react';
-import { buildCodeSet, exportToTxt, exportToSql } from '../lib/api';
+import { useState, useEffect } from 'react';
+import { PackageCheck, Loader2, AlertCircle, Download, Copy, CheckCircle, RotateCcw, ArrowLeft, Plus, ChevronDown, ChevronRight, Save } from 'lucide-react';
+import { buildCodeSet, exportToTxt, exportToSql, saveCodeSet } from '../lib/api';
+import { supabase } from '../lib/supabase';
+import SaveCodeSetModal from './SaveCodeSetModal';
 import type { CartItem, CodeSetResult, ComboFilter } from '../lib/types';
 
 interface Step3CodeSetProps {
@@ -26,6 +28,18 @@ export default function Step3CodeSet({
   const [selectedVocabularies, setSelectedVocabularies] = useState<Set<string>>(new Set());
   const [excludedCodes, setExcludedCodes] = useState<Set<string>>(new Set());
   const [collapsedVocabs, setCollapsedVocabs] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Auto-build when shopping cart is populated (e.g., from editing a saved code set)
+  useEffect(() => {
+    if (shoppingCart.length > 0 && !hasBuilt && !loading) {
+      console.log('Auto-building code set from cart:', shoppingCart);
+      buildSet();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shoppingCart.length]); // Only run when cart length changes
 
   const buildSet = async () => {
     if (shoppingCart.length === 0) return;
@@ -65,6 +79,47 @@ export default function Step3CodeSet({
       setTimeout(() => setSqlCopied(false), 2000);
     } catch (err) {
       setError('Failed to copy SQL to clipboard');
+    }
+  };
+
+  const handleSaveCodeSet = async (name: string, description: string) => {
+    setSaving(true);
+    setSaveSuccess(false);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        throw new Error('Not authenticated');
+      }
+
+      // Convert filtered results (actual built code set) to SavedCodeSetConcept format
+      // Get domain from shopping cart (all items have same domain)
+      const domain = shoppingCart.length > 0 ? shoppingCart[0].domain_id : 'Condition';
+
+      const concepts = filteredResults.map(result => ({
+        hierarchy_concept_id: result.child_concept_id,
+        concept_name: result.child_name,
+        vocabulary_id: result.child_vocabulary_id,
+        concept_class_id: result.concept_class_id,
+        root_term: result.root_concept_name,
+        domain_id: domain,
+      }));
+
+      await saveCodeSet(session.user.id, {
+        code_set_name: name,
+        description: description || `Saved on ${new Date().toLocaleDateString()}`,
+        concepts: concepts,
+      });
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to save code set:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`Failed to save code set: ${errorMessage}\n\nCheck browser console for full details.`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -344,7 +399,27 @@ export default function Step3CodeSet({
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={handleExportTxt} className="btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5">
+              <button
+                onClick={() => setShowSaveModal(true)}
+                disabled={saving || shoppingCart.length === 0}
+                className={`
+                  btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5
+                  ${saveSuccess ? 'bg-green-600 hover:bg-green-700' : ''}
+                `}
+              >
+                {saveSuccess ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Saved!
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    {saving ? 'Saving...' : 'Save Code Set'}
+                  </>
+                )}
+              </button>
+              <button onClick={handleExportTxt} className="btn-secondary flex items-center gap-1.5 text-sm px-3 py-1.5">
                 <Download className="w-4 h-4" />
                 Export as TXT
               </button>
@@ -471,6 +546,14 @@ export default function Step3CodeSet({
           })}
         </>
       )}
+
+      {/* Save Code Set Modal */}
+      <SaveCodeSetModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        onSave={handleSaveCodeSet}
+        conceptCount={filteredResults.length}
+      />
     </div>
   );
 }

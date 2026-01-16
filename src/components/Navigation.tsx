@@ -1,5 +1,6 @@
 import { Search, GitBranch, PackageCheck, ChevronRight, ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AIChatAssistant from './AIChatAssistant';
 
 interface NavigationProps {
   currentStep: 1 | 2 | 3;
@@ -89,6 +90,11 @@ export default function Navigation({ currentStep, onStepClick, cartItemCount, on
                 )}
               </div>
             ))}
+          </div>
+
+          {/* AI Assistant */}
+          <div className="ml-3">
+            <AIChatAssistant />
           </div>
 
           {/* Shopping Cart Button */}

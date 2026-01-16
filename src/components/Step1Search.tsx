@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Search, Loader2, AlertCircle } from 'lucide-react';
-import { searchConcepts } from '../lib/api';
-import { addSearchHistory } from '../lib/supabase';
+import { searchConcepts, trackSearch } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import type { DomainType, SearchResult } from '../lib/types';
 
 interface Step1SearchProps {
@@ -49,10 +49,14 @@ export default function Step1Search({ onConceptSelected }: Step1SearchProps) {
 
       setResults(data);
 
-      // Add to search history (fire and forget)
-      addSearchHistory(searchTerm, domain as DomainType).catch(() => {
-        // Silently fail if user is not logged in or error occurs
-      });
+      // Track search in history (fire and forget)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        trackSearch(session.user.id, searchTerm.trim(), domain as DomainType, data.length)
+          .catch(() => {
+            // Silently fail if tracking errors occur
+          });
+      }
 
       if (data.length === 0) {
         setError('No results found. Try a different search term or domain.');

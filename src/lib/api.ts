@@ -2,6 +2,7 @@
 // API Client for Oracle OMOP Queries
 // ============================================================================
 import axios, { AxiosError } from 'axios';
+import { supabase } from './supabase';
 import type {
   SearchRequest,
   SearchResult,
@@ -10,6 +11,11 @@ import type {
   CodeSetRequest,
   CodeSetResult,
   ApiResponse,
+  UserProfile,
+  SaveCodeSetRequest,
+  GetCodeSetsResponse,
+  GetCodeSetDetailResponse,
+  SearchHistoryRecord,
 } from './types';
 
 // In development with Vercel Dev, API routes are served on the same origin
@@ -22,6 +28,17 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 95000, // 95 seconds (allows for 90s backend timeout + 5s buffer)
+});
+
+// Add request interceptor to include JWT token
+apiClient.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
+  }
+
+  return config;
 });
 
 // ============================================================================
@@ -173,21 +190,217 @@ export const exportToSql = async (data: CodeSetResult[]): Promise<void> => {
   const sql = sqlParts.join('\nOR ');
 
   // Copy to clipboard
+  await navigator.clipboard.writeText(sql);
+};
+
+// ============================================================================
+// User Data API Functions (Azure SQL)
+// ============================================================================
+
+/**
+ * Create or update user profile
+ */
+export const upsertUserProfile = async (
+  userId: string,
+  email: string,
+  displayName?: string
+): Promise<UserProfile> => {
   try {
-    await navigator.clipboard.writeText(sql);
-  } catch (error) {
-    // Fallback for older browsers
-    const textArea = document.createElement('textarea');
-    textArea.value = sql;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.select();
-    try {
-      document.execCommand('copy');
-    } catch (err) {
-      throw new Error('Failed to copy to clipboard');
+    const response = await apiClient.post<ApiResponse<UserProfile>>(
+      '/api/user/profile',
+      { supabase_user_id: userId, email, display_name: displayName }
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to update user profile');
     }
-    document.body.removeChild(textArea);
+
+    return response.data.data;
+  } catch (error) {
+    return handleApiError(error);
   }
+};
+
+/**
+ * Get user profile
+ */
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  try {
+    const response = await apiClient.get<ApiResponse<UserProfile>>(
+      `/api/user/profile/${userId}`
+    );
+
+    if (!response.data.success) {
+      return null;
+    }
+
+    return response.data.data || null;
+  } catch (error) {
+    console.error('Failed to get user profile:', error);
+    return null;
+  }
+};
+
+/**
+ * Save a code set
+ */
+export const saveCodeSet = async (
+  userId: string,
+  request: SaveCodeSetRequest
+): Promise<{ id: number }> => {
+  try {
+    const response = await apiClient.post<ApiResponse<{ id: number }>>(
+      '/api/user/codesets',
+      { supabase_user_id: userId, ...request }
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to save code set');
+    }
+
+    return response.data.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+/**
+ * Get user's saved code sets (metadata only)
+ */
+export const getSavedCodeSets = async (
+  userId: string
+): Promise<GetCodeSetsResponse[]> => {
+  try {
+    const response = await apiClient.get<ApiResponse<GetCodeSetsResponse[]>>(
+      `/api/user/codesets/${userId}`
+    );
+
+    if (!response.data.success || !response.data.data) {
+      return [];
+    }
+
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to get saved code sets:', error);
+    return [];
+  }
+};
+
+/**
+ * Get specific code set with full details
+ */
+export const getCodeSetDetail = async (
+  codeSetId: number
+): Promise<GetCodeSetDetailResponse | null> => {
+  try {
+    const response = await apiClient.get<ApiResponse<GetCodeSetDetailResponse>>(
+      `/api/user/codesets/detail/${codeSetId}`
+    );
+
+    if (!response.data.success || !response.data.data) {
+      return null;
+    }
+
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to get code set detail:', error);
+    return null;
+  }
+};
+
+/**
+ * Delete a saved code set
+ */
+export const deleteCodeSet = async (codeSetId: number): Promise<boolean> => {
+  try {
+    const response = await apiClient.delete<ApiResponse<void>>(
+      `/api/user/codesets/${codeSetId}`
+    );
+
+    return response.data.success;
+  } catch (error) {
+    console.error('Failed to delete code set:', error);
+    return false;
+  }
+};
+
+/**
+ * Track a search in history
+ */
+export const trackSearch = async (
+  userId: string,
+  searchTerm: string,
+  domainType?: string,
+  resultCount?: number
+): Promise<void> => {
+  try {
+    await apiClient.post('/api/user/search-history', {
+      supabase_user_id: userId,
+      search_term: searchTerm,
+      domain_type: domainType,
+      result_count: resultCount,
+    });
+  } catch (error) {
+    // Don't throw error for search tracking failures
+    console.error('Failed to track search:', error);
+  }
+};
+
+/**
+ * Get user's search history
+ */
+export const getSearchHistory = async (
+  userId: string,
+  limit: number = 10
+): Promise<SearchHistoryRecord[]> => {
+  try {
+    const response = await apiClient.get<ApiResponse<SearchHistoryRecord[]>>(
+      `/api/user/search-history/${userId}`,
+      { params: { limit } }
+    );
+
+    if (!response.data.success || !response.data.data) {
+      return [];
+    }
+
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to get search history:', error);
+    return [];
+  }
+};
+
+// ============================================================================
+// OpenAI Chat Assistant
+// ============================================================================
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  message: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+/**
+ * Send a message to the OpenAI chat assistant
+ */
+export const sendChatMessage = async (
+  messages: ChatMessage[]
+): Promise<string> => {
+  const response = await apiClient.post<ApiResponse<ChatResponse>>(
+    '/api/chat',
+    { messages }
+  );
+
+  if (!response.data.success || !response.data.data) {
+    throw new Error('Invalid chat response');
+  }
+
+  return response.data.data.message;
 };
