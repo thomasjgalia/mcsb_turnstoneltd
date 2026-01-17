@@ -6,11 +6,14 @@ interface SaveCodeSetModalProps {
   onClose: () => void;
   onSave: (name: string, description: string) => void;
   conceptCount: number;
+  saving?: boolean;
 }
 
-export default function SaveCodeSetModal({ isOpen, onClose, onSave, conceptCount }: SaveCodeSetModalProps) {
+export default function SaveCodeSetModal({ isOpen, onClose, onSave, conceptCount, saving }: SaveCodeSetModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+
+  const isLargeCodeSet = conceptCount > 10000;
 
   if (!isOpen) return null;
 
@@ -74,10 +77,20 @@ export default function SaveCodeSetModal({ isOpen, onClose, onSave, conceptCount
             />
           </div>
 
-          <div className="mb-4 p-3 bg-blue-50 rounded-md">
-            <p className="text-sm text-blue-800">
-              This code set will include <strong>{conceptCount}</strong> concept{conceptCount !== 1 ? 's' : ''}.
+          <div className={`mb-4 p-3 rounded-md ${isLargeCodeSet ? 'bg-amber-50' : 'bg-blue-50'}`}>
+            <p className={`text-sm ${isLargeCodeSet ? 'text-amber-800' : 'text-blue-800'}`}>
+              This code set will include <strong>{conceptCount.toLocaleString()}</strong> concept{conceptCount !== 1 ? 's' : ''}.
             </p>
+            {isLargeCodeSet && !saving && (
+              <p className="text-sm text-amber-700 mt-2 font-medium">
+                ⚠️ Large code sets may take 30-60 seconds to save.
+              </p>
+            )}
+            {saving && isLargeCodeSet && (
+              <p className="text-sm text-amber-700 mt-2 font-medium animate-pulse">
+                Processing {conceptCount.toLocaleString()} concepts... This may take 30-60 seconds. Please wait.
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3">
@@ -85,15 +98,16 @@ export default function SaveCodeSetModal({ isOpen, onClose, onSave, conceptCount
               type="button"
               onClick={handleClose}
               className="flex-1 btn-secondary"
+              disabled={saving}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 btn-primary"
-              disabled={!name.trim()}
+              className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!name.trim() || saving}
             >
-              Save Code Set
+              {saving ? 'Saving...' : 'Save Code Set'}
             </button>
           </div>
         </form>

@@ -125,6 +125,7 @@ export default function Step3CodeSet({
       console.log('✅ Code set saved successfully:', saveResult);
 
       setSaveSuccess(true);
+      setShowSaveModal(false);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
       console.error('❌ Failed to save code set:', error);
@@ -658,9 +659,10 @@ export default function Step3CodeSet({
       {/* Save Code Set Modal */}
       <SaveCodeSetModal
         isOpen={showSaveModal}
-        onClose={() => setShowSaveModal(false)}
+        onClose={() => !saving && setShowSaveModal(false)}
         onSave={handleSaveCodeSet}
         conceptCount={filteredResults.length}
+        saving={saving}
       />
     </div>
   );
