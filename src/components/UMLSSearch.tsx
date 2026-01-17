@@ -52,6 +52,7 @@ export default function UMLSSearch() {
     setResults([]);
 
     try {
+      console.log('Searching UMLS with vocabularies:', selectedVocabs);
       const response = await searchUMLS({
         searchTerm: searchTerm.trim(),
         vocabularies: selectedVocabs.length > 0 ? selectedVocabs : undefined,
@@ -79,11 +80,14 @@ export default function UMLSSearch() {
   };
 
   const toggleVocabulary = (vocab: string) => {
-    setSelectedVocabs(prev =>
-      prev.includes(vocab)
+    console.log('Toggling vocabulary:', vocab);
+    setSelectedVocabs(prev => {
+      const newVocabs = prev.includes(vocab)
         ? prev.filter(v => v !== vocab)
-        : [...prev, vocab]
-    );
+        : [...prev, vocab];
+      console.log('Selected vocabularies:', newVocabs);
+      return newVocabs;
+    });
   };
 
   const clearSearch = () => {
@@ -195,6 +199,7 @@ export default function UMLSSearch() {
                       return (
                         <button
                           key={vocab.value}
+                          type="button"
                           onClick={() => toggleVocabulary(vocab.value)}
                           className={`
                             px-2 py-1 rounded-lg border text-xs font-medium transition-colors
@@ -212,6 +217,7 @@ export default function UMLSSearch() {
                   </div>
                   {selectedVocabs.length > 0 && (
                     <button
+                      type="button"
                       onClick={() => setSelectedVocabs([])}
                       className="text-xs text-green-600 hover:text-green-700 font-medium mt-1.5"
                     >
