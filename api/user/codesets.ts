@@ -112,6 +112,14 @@ async function handleSaveCodeSet(
     const conceptsJson = JSON.stringify(concepts);
     const totalConcepts = concepts.length;
 
+    console.log(`💾 Saving ${source_type} code set:`, {
+      name: code_set_name,
+      conceptsCount: totalConcepts,
+      conceptsJsonLength: conceptsJson.length,
+      firstConcept: concepts[0],
+      lastConcept: concepts[concepts.length - 1]
+    });
+
     const query = `
       INSERT INTO saved_code_sets
         (supabase_user_id, code_set_name, description, concepts, total_concepts, source_type, source_metadata)
@@ -132,7 +140,7 @@ async function handleSaveCodeSet(
     const result = await request.query(query);
     const id = result.recordset[0].id;
 
-    console.log(`✅ ${source_type} code set saved:`, id);
+    console.log(`✅ ${source_type} code set saved:`, id, `with ${totalConcepts} concepts`);
     return res.status(200).json(createSuccessResponse({ id }));
   } catch (error) {
     console.error('Failed to save code set:', error);
@@ -236,13 +244,23 @@ async function handleGetCodeSetDetail(
       return res.status(403).json(createErrorResponse('Forbidden', 403));
     }
 
+    console.log('📄 Retrieved code set from DB:', {
+      id: codeSetId,
+      name: codeSet.code_set_name,
+      source_type: codeSet.source_type,
+      total_concepts: codeSet.total_concepts,
+      conceptsFieldLength: codeSet.concepts?.length || 0,
+      conceptsPreview: codeSet.concepts?.substring(0, 200)
+    });
+
     // Parse concepts JSON
+    const parsedConcepts = JSON.parse(codeSet.concepts);
     const response = {
       ...codeSet,
-      concepts: JSON.parse(codeSet.concepts),
+      concepts: parsedConcepts,
     };
 
-    console.log('✅ Retrieved code set detail:', codeSetId, '- concepts:', response.concepts.length);
+    console.log('✅ Retrieved code set detail:', codeSetId, '- parsed concepts count:', parsedConcepts.length, 'DB total_concepts:', codeSet.total_concepts);
     return res.status(200).json(createSuccessResponse(response));
   } catch (error) {
     console.error('Failed to get code set detail:', error);
