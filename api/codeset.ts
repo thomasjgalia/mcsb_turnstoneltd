@@ -25,6 +25,8 @@ interface CodeSetResult {
   combinationyesno?: string;
   dose_form?: string;
   dfg_name?: string;
+  concept_attribute?: string;
+  value?: string;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -88,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           vocabularyList = "('')";
       }
 
-      // Build the code set query (v2 - enhanced dose form grouping and combo logic)
+      // Build the code set query (v3 - added concept_attribute)
       const sql = `
         SELECT
           c.concept_name                      AS root_concept_name,
@@ -102,7 +104,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ELSE combo.combinationyesno
           END                                 AS combinationyesno,
           frm.concept_name                    AS dose_form,
-          dfglbl.dfg_label                    AS dfg_name
+          dfglbl.dfg_label                    AS dfg_name,
+          attr.concept_attribute              AS concept_attribute,
+          attr.value                          AS value
         FROM concept c
         JOIN concept_ancestor ca
           ON ca.ancestor_concept_id = c.concept_id
@@ -113,6 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ON d.concept_id = cr.concept_id_1
          AND d.domain_id  = @domain_id
          AND d.vocabulary_id IN ${vocabularyList}
+        LEFT JOIN concept_attribute attr
+          ON attr.concept_id = ca.descendant_concept_id
         LEFT JOIN concept_relationship f
           ON f.concept_id_1   = ca.descendant_concept_id
          AND f.relationship_id = 'RxNorm has dose form'

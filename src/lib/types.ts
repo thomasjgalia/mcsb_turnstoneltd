@@ -59,6 +59,8 @@ export interface CodeSetResult {
   combinationyesno?: string;  // Drug domain only
   dose_form?: string;          // Drug domain only
   dfg_name?: string;           // Drug domain only
+  concept_attribute?: string;  // Optional attribute
+  value?: string;              // Optional attribute value
 }
 
 export interface CodeSetRequest {

@@ -31,6 +31,8 @@ export default function Step3CodeSet({
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [selectedAttribute, setSelectedAttribute] = useState<string>('');
+  const [selectedValue, setSelectedValue] = useState<string>('');
 
   // Auto-build when shopping cart is populated (e.g., from editing a saved code set)
   useEffect(() => {
@@ -117,9 +119,38 @@ export default function Step3CodeSet({
     new Set(results.map((r) => r.child_vocabulary_id))
   ).sort();
 
-  // Filter results based on selected vocabularies only (keep excluded codes visible)
+  // Get unique attributes from results
+  const availableAttributes = Array.from(
+    new Set(results.filter((r) => r.concept_attribute).map((r) => r.concept_attribute as string))
+  ).sort();
+
+  // Get values for the selected attribute
+  const availableValues = selectedAttribute
+    ? Array.from(
+        new Set(
+          results
+            .filter((r) => r.concept_attribute === selectedAttribute && r.value)
+            .map((r) => r.value as string)
+        )
+      ).sort()
+    : [];
+
+  // Reset selected value when attribute changes
+  useEffect(() => {
+    setSelectedValue('');
+  }, [selectedAttribute]);
+
+  // Filter results based on selected vocabularies and attribute/value
   const visibleResults = results
-    .filter((r) => selectedVocabularies.size === 0 || selectedVocabularies.has(r.child_vocabulary_id));
+    .filter((r) => selectedVocabularies.size === 0 || selectedVocabularies.has(r.child_vocabulary_id))
+    .filter((r) => {
+      // If attribute filter is not active, show all results
+      if (!selectedAttribute || !selectedValue) {
+        return true;
+      }
+      // If attribute filter is active, only show matching results
+      return r.concept_attribute === selectedAttribute && r.value === selectedValue;
+    });
 
   // Filter for export (exclude unchecked codes)
   const filteredResults = visibleResults
@@ -375,6 +406,70 @@ export default function Step3CodeSet({
             </div>
           )}
 
+          {/* Attribute Filter (if attributes exist) */}
+          {availableAttributes.length > 0 && (
+            <div className="card p-3">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                Filter by Attribute
+              </h3>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label htmlFor="attributeFilter" className="block text-xs font-medium text-gray-700 mb-1">
+                    Attribute
+                  </label>
+                  <select
+                    id="attributeFilter"
+                    value={selectedAttribute}
+                    onChange={(e) => setSelectedAttribute(e.target.value)}
+                    className="select-field text-sm w-full"
+                  >
+                    <option value="">All (no filter)</option>
+                    {availableAttributes.map((attr) => (
+                      <option key={attr} value={attr}>
+                        {attr}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label htmlFor="valueFilter" className="block text-xs font-medium text-gray-700 mb-1">
+                    Value
+                  </label>
+                  <select
+                    id="valueFilter"
+                    value={selectedValue}
+                    onChange={(e) => setSelectedValue(e.target.value)}
+                    className="select-field text-sm w-full"
+                    disabled={!selectedAttribute || availableValues.length === 0}
+                  >
+                    <option value="">Select a value...</option>
+                    {availableValues.map((val) => (
+                      <option key={val} value={val}>
+                        {val}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {(selectedAttribute || selectedValue) && (
+                  <button
+                    onClick={() => {
+                      setSelectedAttribute('');
+                      setSelectedValue('');
+                    }}
+                    className="btn-secondary text-xs px-3 py-2 whitespace-nowrap"
+                  >
+                    Clear Filter
+                  </button>
+                )}
+              </div>
+              {selectedAttribute && selectedValue && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Filtered to {visibleResults.length} codes with {selectedAttribute} = {selectedValue}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Export Buttons */}
           <div className="card p-3">
             <div className="mb-2">
@@ -477,6 +572,8 @@ export default function Step3CodeSet({
                       {vocabResults[0]?.combinationyesno && <th className="text-xs py-1.5">Combo</th>}
                       {vocabResults[0]?.dose_form && <th className="text-xs py-1.5">Dose Form</th>}
                       {vocabResults[0]?.dfg_name && <th className="text-xs py-1.5">DFG Category</th>}
+                      {vocabResults.some((r) => r.concept_attribute) && <th className="text-xs py-1.5">Attribute</th>}
+                      {vocabResults.some((r) => r.value) && <th className="text-xs py-1.5">Value</th>}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -522,6 +619,12 @@ export default function Step3CodeSet({
                               {result.dfg_name}
                             </span>
                           </td>
+                        )}
+                        {vocabResults.some((r) => r.concept_attribute) && (
+                          <td className="text-xs text-gray-600 py-1.5 px-2">{result.concept_attribute || '-'}</td>
+                        )}
+                        {vocabResults.some((r) => r.value) && (
+                          <td className="text-xs text-gray-600 py-1.5 px-2">{result.value || '-'}</td>
                         )}
                       </tr>
                     );
