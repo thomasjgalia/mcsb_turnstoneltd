@@ -95,23 +95,34 @@ export default function Step3CodeSet({
         throw new Error('Not authenticated');
       }
 
+      // Convert built code set results to SavedCodeSetConcept format
+      // We need to save the full built code set, not just the shopping cart
+      const conceptsToSave = filteredResults.map(result => ({
+        hierarchy_concept_id: result.child_concept_id,
+        concept_name: result.child_name,
+        vocabulary_id: result.child_vocabulary_id,
+        concept_class_id: result.concept_class_id,
+        root_term: result.root_concept_name,
+        domain_id: shoppingCart[0]?.domain_id || 'Condition', // Use domain from cart
+      }));
+
       console.log('💾 Saving code set:', {
         userId: session.user.id,
         name,
         description,
-        conceptCount: shoppingCart.length,
+        conceptCount: conceptsToSave.length,
+        rootConceptsInCart: shoppingCart.length,
       });
 
-      // Save the shopping cart items (hierarchy concepts), not the built code set
-      // This allows saving before building
-      const result = await saveCodeSet(session.user.id, {
+      // Save the built code set (all descendant codes)
+      const saveResult = await saveCodeSet(session.user.id, {
         code_set_name: name,
         description: description || `Saved on ${new Date().toLocaleDateString()}`,
-        concepts: shoppingCart,
+        concepts: conceptsToSave,
         source_type: 'OMOP',
       });
 
-      console.log('✅ Code set saved successfully:', result);
+      console.log('✅ Code set saved successfully:', saveResult);
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
