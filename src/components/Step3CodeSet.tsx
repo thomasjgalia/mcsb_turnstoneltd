@@ -95,18 +95,27 @@ export default function Step3CodeSet({
         throw new Error('Not authenticated');
       }
 
+      console.log('💾 Saving code set:', {
+        userId: session.user.id,
+        name,
+        description,
+        conceptCount: shoppingCart.length,
+      });
+
       // Save the shopping cart items (hierarchy concepts), not the built code set
       // This allows saving before building
-      await saveCodeSet(session.user.id, {
+      const result = await saveCodeSet(session.user.id, {
         code_set_name: name,
         description: description || `Saved on ${new Date().toLocaleDateString()}`,
         concepts: shoppingCart,
       });
 
+      console.log('✅ Code set saved successfully:', result);
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
-      console.error('Failed to save code set:', error);
+      console.error('❌ Failed to save code set:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       alert(`Failed to save code set: ${errorMessage}\n\nCheck browser console for full details.`);
     } finally {
@@ -353,120 +362,124 @@ export default function Step3CodeSet({
       {/* Results */}
       {!loading && results.length > 0 && (
         <>
-          {/* Vocabulary Filter */}
-          {availableVocabularies.length > 1 && (
-            <div className="card p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-900">
-                  Filter by Vocabulary
-                </h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={selectAllVocabularies}
-                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    Select All
-                  </button>
-                  <span className="text-gray-300">|</span>
-                  <button
-                    onClick={clearAllVocabularies}
-                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {availableVocabularies.map((vocab) => {
-                  const count = results.filter((r) => r.child_vocabulary_id === vocab).length;
-                  const isSelected = selectedVocabularies.has(vocab);
-                  return (
-                    <button
-                      key={vocab}
-                      onClick={() => toggleVocabulary(vocab)}
-                      className={`
-                        px-2 py-1 rounded-lg border text-xs font-medium transition-colors
-                        ${
-                          isSelected
-                            ? 'bg-primary-100 border-primary-300 text-primary-700'
-                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      {vocab} ({count})
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-2 text-xs text-gray-500">
-                {selectedVocabularies.size === 0
-                  ? `Showing all ${visibleResults.length} codes from ${availableVocabularies.length} vocabularies`
-                  : `Showing ${visibleResults.length} of ${results.length} codes from ${selectedVocabularies.size} selected ${selectedVocabularies.size === 1 ? 'vocabulary' : 'vocabularies'}`}
-              </p>
-            </div>
-          )}
-
-          {/* Attribute Filter (if attributes exist) */}
-          {availableAttributes.length > 0 && (
+          {/* Combined Filters Panel */}
+          {(availableVocabularies.length > 1 || availableAttributes.length > 0) && (
             <div className="card p-3">
               <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                Filter by Attribute
+                Filters
               </h3>
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <label htmlFor="attributeFilter" className="block text-xs font-medium text-gray-700 mb-1">
-                    Attribute
-                  </label>
-                  <select
-                    id="attributeFilter"
-                    value={selectedAttribute}
-                    onChange={(e) => setSelectedAttribute(e.target.value)}
-                    className="select-field text-sm w-full"
-                  >
-                    <option value="">All (no filter)</option>
-                    {availableAttributes.map((attr) => (
-                      <option key={attr} value={attr}>
-                        {attr}
-                      </option>
-                    ))}
-                  </select>
+
+              {/* Attribute Filter (if attributes exist) */}
+              {availableAttributes.length > 0 && (
+                <div className="mb-3 pb-3 border-b border-gray-200">
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <label htmlFor="attributeFilter" className="block text-xs font-medium text-gray-700 mb-1">
+                        Attribute
+                      </label>
+                      <select
+                        id="attributeFilter"
+                        value={selectedAttribute}
+                        onChange={(e) => setSelectedAttribute(e.target.value)}
+                        className="select-field text-xs w-full"
+                      >
+                        <option value="">All (no filter)</option>
+                        {availableAttributes.map((attr) => (
+                          <option key={attr} value={attr}>
+                            {attr}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label htmlFor="valueFilter" className="block text-xs font-medium text-gray-700 mb-1">
+                        Value
+                      </label>
+                      <select
+                        id="valueFilter"
+                        value={selectedValue}
+                        onChange={(e) => setSelectedValue(e.target.value)}
+                        className="select-field text-xs w-full"
+                        disabled={!selectedAttribute || availableValues.length === 0}
+                      >
+                        <option value="">Select a value...</option>
+                        {availableValues.map((val) => (
+                          <option key={val} value={val}>
+                            {val}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {(selectedAttribute || selectedValue) && (
+                      <button
+                        onClick={() => {
+                          setSelectedAttribute('');
+                          setSelectedValue('');
+                        }}
+                        className="btn-secondary text-xs px-2 py-1.5 whitespace-nowrap"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <label htmlFor="valueFilter" className="block text-xs font-medium text-gray-700 mb-1">
-                    Value
-                  </label>
-                  <select
-                    id="valueFilter"
-                    value={selectedValue}
-                    onChange={(e) => setSelectedValue(e.target.value)}
-                    className="select-field text-sm w-full"
-                    disabled={!selectedAttribute || availableValues.length === 0}
-                  >
-                    <option value="">Select a value...</option>
-                    {availableValues.map((val) => (
-                      <option key={val} value={val}>
-                        {val}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {(selectedAttribute || selectedValue) && (
-                  <button
-                    onClick={() => {
-                      setSelectedAttribute('');
-                      setSelectedValue('');
-                    }}
-                    className="btn-secondary text-xs px-3 py-2 whitespace-nowrap"
-                  >
-                    Clear Filter
-                  </button>
-                )}
-              </div>
-              {selectedAttribute && selectedValue && (
-                <p className="mt-2 text-xs text-gray-500">
-                  Filtered to {visibleResults.length} codes with {selectedAttribute} = {selectedValue}
-                </p>
               )}
+
+              {/* Vocabulary Filter */}
+              {availableVocabularies.length > 1 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-gray-700">
+                      Vocabularies
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={selectAllVocabularies}
+                        className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        All
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        onClick={clearAllVocabularies}
+                        className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        None
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableVocabularies.map((vocab) => {
+                      const count = results.filter((r) => r.child_vocabulary_id === vocab).length;
+                      const isSelected = selectedVocabularies.has(vocab);
+                      return (
+                        <button
+                          key={vocab}
+                          onClick={() => toggleVocabulary(vocab)}
+                          className={`
+                            px-2 py-1 rounded-lg border text-xs font-medium transition-colors
+                            ${
+                              isSelected
+                                ? 'bg-primary-100 border-primary-300 text-primary-700'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }
+                          `}
+                        >
+                          {vocab} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <p className="mt-2 text-xs text-gray-500">
+                {selectedAttribute && selectedValue
+                  ? `Filtered to ${visibleResults.length} codes with ${selectedAttribute} = ${selectedValue}`
+                  : selectedVocabularies.size === 0
+                  ? `Showing all ${visibleResults.length} codes`
+                  : `Showing ${visibleResults.length} of ${results.length} codes from ${selectedVocabularies.size} ${selectedVocabularies.size === 1 ? 'vocabulary' : 'vocabularies'}`}
+              </p>
             </div>
           )}
 

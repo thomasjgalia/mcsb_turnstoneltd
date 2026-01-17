@@ -34,6 +34,7 @@ export default function Step1Search({
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [selectedVocabulary, setSelectedVocabulary] = useState<string>('');
   const [selectedConceptClass, setSelectedConceptClass] = useState<string>('');
+  const [textFilter, setTextFilter] = useState<string>('');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,13 +102,22 @@ export default function Step1Search({
     new Set(results.map((r) => r.searched_concept_class_id))
   ).sort();
 
-  // Filter results based on selections
+  // Filter results based on selections and text filter
   const filteredResults = results.filter((result) => {
     if (selectedVocabulary && result.searched_vocabulary !== selectedVocabulary) {
       return false;
     }
     if (selectedConceptClass && result.searched_concept_class_id !== selectedConceptClass) {
       return false;
+    }
+    if (textFilter) {
+      const searchText = textFilter.toLowerCase();
+      const matchesSearched = result.searched_term?.toLowerCase().includes(searchText);
+      const matchesStandard = result.standard_name?.toLowerCase().includes(searchText);
+      const matchesCode = result.standard_code?.toLowerCase().includes(searchText);
+      if (!matchesSearched && !matchesStandard && !matchesCode) {
+        return false;
+      }
     }
     return true;
   });
@@ -116,6 +126,22 @@ export default function Step1Search({
   const clearFilters = () => {
     setSelectedVocabulary('');
     setSelectedConceptClass('');
+    setTextFilter('');
+  };
+
+  // Clear entire search
+  const clearSearch = () => {
+    setSearchTerm('');
+    setDomain('');
+    setResults([]);
+    setSearchResults([]);
+    setLastSearchTerm('');
+    setLastSearchDomain('');
+    setSelectedRow(null);
+    setSelectedVocabulary('');
+    setSelectedConceptClass('');
+    setTextFilter('');
+    setError(null);
   };
 
   return (
@@ -180,6 +206,17 @@ export default function Step1Search({
               </>
             )}
           </button>
+
+          {/* Clear Search Button */}
+          {results.length > 0 && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="btn-secondary text-sm px-4 py-2 whitespace-nowrap"
+            >
+              Clear Search
+            </button>
+          )}
         </div>
       </form>
 
@@ -203,6 +240,15 @@ export default function Step1Search({
               {/* Inline Filters */}
               {results.length > 1 && (
                 <>
+                  {/* Text Filter */}
+                  <input
+                    type="text"
+                    value={textFilter}
+                    onChange={(e) => setTextFilter(e.target.value)}
+                    placeholder="Filter results..."
+                    className="input-field text-xs py-1 px-2 w-40"
+                  />
+
                   <select
                     value={selectedVocabulary}
                     onChange={(e) => setSelectedVocabulary(e.target.value)}
@@ -235,7 +281,7 @@ export default function Step1Search({
                     })}
                   </select>
 
-                  {(selectedVocabulary || selectedConceptClass) && (
+                  {(selectedVocabulary || selectedConceptClass || textFilter) && (
                     <button
                       onClick={clearFilters}
                       className="text-xs text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap"
