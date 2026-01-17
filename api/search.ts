@@ -85,40 +85,113 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Build the SQL query (T-SQL syntax for Azure SQL)
+    // Supports ATC and other classification concepts by not requiring standard mappings
     const sql = `
+      WITH hits AS (
+        SELECT
+          c.concept_id,
+          c.concept_name,
+          c.concept_code,
+          c.vocabulary_id,
+          c.domain_id,
+          c.concept_class_id,
+          c.standard_concept,
+          c.invalid_reason,
+          -- Match flags for ranking
+          CASE WHEN TRY_CAST(@searchterm AS BIGINT) = c.concept_id THEN 1 ELSE 0 END AS is_exact_id_match,
+          CASE WHEN c.concept_code = @searchterm THEN 1 ELSE 0 END AS is_exact_code_match,
+          ABS(LEN(@searchterm) - LEN(c.concept_name)) AS name_length_delta
+        FROM concept c
+        WHERE
+          -- Flexible search: concept_id, concept_code, or concept_name
+          UPPER(CAST(c.concept_id AS NVARCHAR(30)) + ' ' + c.concept_code + ' ' + c.concept_name)
+            LIKE '%' + UPPER(@searchterm) + '%'
+          AND c.domain_id = @domain_id
+          AND c.vocabulary_id IN ${vocabularyList}
+          AND (
+               c.domain_id <> 'Drug'
+            OR c.concept_class_id IN (
+                 'Clinical Drug','Branded Drug','Ingredient','Clinical Pack','Branded Pack',
+                 'Quant Clinical Drug','Quant Branded Drug','11-digit NDC',
+                 -- ATC classification levels
+                 'ATC 1st','ATC 2nd','ATC 3rd','ATC 4th','ATC 5th'
+               )
+            OR c.vocabulary_id = 'ATC'
+          )
+          AND (c.invalid_reason IS NULL OR c.invalid_reason = '')
+      ),
+      mapped AS (
+        -- Optional mapping to standard concepts (prefer when available)
+        SELECT
+          h.*,
+          cr.relationship_id,
+          s.concept_id       AS s_concept_id,
+          s.concept_name     AS s_concept_name,
+          s.concept_code     AS s_concept_code,
+          s.vocabulary_id    AS s_vocabulary_id,
+          s.concept_class_id AS s_concept_class_id,
+          s.standard_concept AS s_standard_concept
+        FROM hits h
+        LEFT JOIN concept_relationship cr
+          ON cr.concept_id_1 = h.concept_id
+         AND cr.relationship_id = 'Maps to'
+        LEFT JOIN concept s
+          ON s.concept_id = cr.concept_id_2
+         AND s.standard_concept = 'S'
+      )
       SELECT TOP 75
-        s.concept_name               AS standard_name,
-        s.concept_id                 AS std_concept_id,
-        s.concept_code               AS standard_code,
-        s.vocabulary_id              AS standard_vocabulary,
-        s.concept_class_id           AS concept_class_id,
-        c.concept_name               AS search_result,
-        c.concept_code               AS searched_code,
-        c.vocabulary_id              AS searched_vocabulary,
-        c.concept_class_id           AS searched_concept_class_id,
-        CAST(c.concept_id AS NVARCHAR) + ' ' + c.concept_code + ' ' + c.concept_name AS searched_term
-      FROM concept c
-      LEFT JOIN concept_relationship cr
-        ON cr.concept_id_1 = c.concept_id
-       AND cr.relationship_id = 'Maps to'
-      LEFT JOIN concept s
-        ON s.concept_id = cr.concept_id_2
-       AND s.standard_concept = 'S'
-      WHERE
-        UPPER(CAST(c.concept_id AS NVARCHAR) + ' ' + c.concept_code + ' ' + c.concept_name)
-          LIKE '%' + UPPER(@searchterm) + '%'
-        AND c.domain_id = @domain_id
-        AND c.vocabulary_id IN ${vocabularyList}
-        AND (
-             c.domain_id <> 'Drug'
-          OR c.concept_class_id IN (
-               'Clinical Drug','Branded Drug','Ingredient','Clinical Pack','Branded Pack',
-               'Quant Clinical Drug','Quant Branded Drug','11-digit NDC'
-             )
-        )
-        AND (c.invalid_reason IS NULL OR c.invalid_reason = '')
-        AND s.concept_id IS NOT NULL
-      ORDER BY ABS(LEN(@searchterm) - LEN(c.concept_name)) ASC
+        -- Prefer mapped standard target if present; otherwise use searched concept
+        COALESCE(
+          s_concept_name,
+          CASE WHEN standard_concept = 'S' THEN concept_name END,
+          concept_name
+        ) AS standard_name,
+
+        COALESCE(
+          s_concept_id,
+          CASE WHEN standard_concept = 'S' THEN concept_id END,
+          concept_id
+        ) AS std_concept_id,
+
+        COALESCE(
+          s_concept_code,
+          CASE WHEN standard_concept = 'S' THEN concept_code END,
+          concept_code
+        ) AS standard_code,
+
+        COALESCE(
+          s_vocabulary_id,
+          CASE WHEN standard_concept = 'S' THEN vocabulary_id END,
+          vocabulary_id
+        ) AS standard_vocabulary,
+
+        COALESCE(
+          s_concept_class_id,
+          CASE WHEN standard_concept = 'S' THEN concept_class_id END,
+          concept_class_id
+        ) AS concept_class_id,
+
+        -- Echo the searched concept context
+        concept_name         AS search_result,
+        concept_code         AS searched_code,
+        vocabulary_id        AS searched_vocabulary,
+        concept_class_id     AS searched_concept_class_id,
+        CAST(concept_id AS NVARCHAR(30)) + ' ' + concept_code + ' ' + concept_name AS searched_term
+      FROM mapped
+      ORDER BY
+        -- 1) Exact ID matches first
+        CASE WHEN is_exact_id_match = 1 THEN 0 ELSE 1 END,
+        -- 2) Exact code matches next
+        CASE WHEN is_exact_code_match = 1 THEN 0 ELSE 1 END,
+        -- 3) Prefer mapped standard targets over unmapped originals
+        CASE
+          WHEN s_concept_id IS NOT NULL THEN 0  -- Mapped standard exists
+          WHEN standard_concept = 'S'    THEN 1  -- Already standard
+          ELSE 2  -- Unmapped original (e.g., ATC classification)
+        END,
+        -- 4) Name proximity
+        name_length_delta,
+        concept_name
     `;
 
     // Execute query
