@@ -135,9 +135,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         c.concept_id = @concept_id
         AND a.vocabulary_id IN ${vocabularyList}
         AND (
-             -- Drug domain descendant refinement
+             -- Drug domain descendant refinement (now matches parents)
              (@domain_id = 'Drug' AND (
-                  a.vocabulary_id = 'RxNorm' AND a.concept_class_id IN ('Clinical Drug','Ingredient')
+                  (a.vocabulary_id = 'ATC'    AND a.concept_class_id IN ('ATC 5th','ATC 4th','ATC 3rd','ATC 2nd','ATC 1st'))
+               OR (a.vocabulary_id = 'RxNorm' AND a.concept_class_id IN ('Clinical Drug','Ingredient'))
              ))
           -- Pass-through for all other domains
           OR (@domain_id <> 'Drug')
