@@ -15,7 +15,7 @@ interface Step1SearchProps {
   setLastSearchDomain: (domain: DomainType | '') => void;
 }
 
-const DOMAINS: DomainType[] = ['Condition', 'Drug', 'Procedure', 'Measurement', 'Observation', 'Device'];
+const DOMAINS: DomainType[] = ['Condition', 'Drug', 'Procedure', 'Measurement', 'Observation', 'Device', 'Aman\'s Domain'];
 
 export default function Step1Search({
   onConceptSelected,
