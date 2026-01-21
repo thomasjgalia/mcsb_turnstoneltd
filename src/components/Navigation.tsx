@@ -1,4 +1,4 @@
-import { Search, GitBranch, PackageCheck, ChevronRight, ShoppingCart } from 'lucide-react';
+import { Search, GitBranch, PackageCheck, ChevronRight, ShoppingCart, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AIChatAssistant from './AIChatAssistant';
 import UMLSSearch from './UMLSSearch';
@@ -9,9 +9,10 @@ interface NavigationProps {
   onStepClick: (step: 0 | 1 | 2 | 3) => void;
   cartItemCount: number;
   onCartClick: () => void;
+  onStartOver: () => void;
 }
 
-export default function Navigation({ currentStep, workflow, onStepClick, cartItemCount, onCartClick }: NavigationProps) {
+export default function Navigation({ currentStep, workflow, onStepClick, cartItemCount, onCartClick, onStartOver }: NavigationProps) {
   const navigate = useNavigate();
 
   // Define steps based on workflow
@@ -100,8 +101,16 @@ export default function Navigation({ currentStep, workflow, onStepClick, cartIte
             ))}
           </div>
 
-          {/* AI Assistant & UMLS Search */}
+          {/* Home Button, AI Assistant & UMLS Search */}
           <div className="ml-3 flex items-center gap-2">
+            <button
+              onClick={onStartOver}
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-1.5 text-gray-700 hover:text-primary-600"
+              title="Return to home and start over"
+            >
+              <Home className="w-5 h-5" />
+              <span className="text-xs font-medium">Home</span>
+            </button>
             <AIChatAssistant />
             <UMLSSearch />
           </div>

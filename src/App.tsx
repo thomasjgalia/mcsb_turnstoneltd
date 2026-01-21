@@ -219,6 +219,7 @@ function AppContent() {
             onStepClick={goToStep}
             cartItemCount={shoppingCart.length}
             onCartClick={() => setIsCartOpen(true)}
+            onStartOver={handleStartOver}
           />
         )}
 

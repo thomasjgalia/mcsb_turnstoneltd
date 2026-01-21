@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, Trash2, Eye, RefreshCw, Edit } from 'lucide-react';
+import { Download, Trash2, Eye, RefreshCw, Edit, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getSavedCodeSets, getCodeSetDetail, deleteCodeSet } from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -204,7 +204,17 @@ export default function SavedCodeSets() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-4 flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Saved Code Sets</h2>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="btn-secondary text-sm flex items-center gap-2"
+            title="Go back"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Saved Code Sets</h2>
+        </div>
         <button
           onClick={loadCodeSets}
           className="btn-secondary text-sm flex items-center gap-2"
