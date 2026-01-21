@@ -30,6 +30,25 @@ interface CodeSetResult {
   value?: string;
 }
 
+/**
+ * Deduplicates code set results based on unique combination of:
+ * vocabulary, code, name, concept_id, and class
+ */
+function deduplicateResults(results: CodeSetResult[]): CodeSetResult[] {
+  const seen = new Map<string, CodeSetResult>();
+
+  for (const result of results) {
+    // Create a unique key based on vocabulary, code, name, concept_id, and class
+    const key = `${result.child_vocabulary_id}|${result.child_code}|${result.child_name}|${result.child_concept_id}|${result.concept_class_id}`;
+
+    if (!seen.has(key)) {
+      seen.set(key, result);
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -93,9 +112,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const duration = Date.now() - startTime;
       console.log(`✅ Direct Build: Completed in ${duration}ms - returned ${results.length} results`);
 
+      // Deduplicate results based on vocabulary, code, name, concept_id, and class
+      const deduped = deduplicateResults(allResults);
+      console.log(`🔄 Direct Build: Deduplicated from ${allResults.length} to ${deduped.length} unique concepts`);
+
       return res.status(200).json({
         success: true,
-        data: allResults,
+        data: deduped,
       });
     }
 
@@ -235,9 +258,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       allResults.push(...results);
     }
 
+    // Deduplicate results based on vocabulary, code, name, concept_id, and class
+    const deduped = deduplicateResults(allResults);
+    console.log(`🔄 Hierarchical Build: Deduplicated from ${allResults.length} to ${deduped.length} unique concepts`);
+
     return res.status(200).json({
       success: true,
-      data: allResults,
+      data: deduped,
     });
   } catch (error) {
     console.error('Code set API error:', error);
