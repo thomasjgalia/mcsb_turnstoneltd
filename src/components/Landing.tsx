@@ -73,11 +73,11 @@ export default function Landing({ onSelectWorkflow, connectionStatus, errorMessa
             <div className="space-y-2 mb-4">
               <div className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                <span className="text-sm text-gray-700">Complete hierarchy with all descendants</span>
+                <span className="text-sm text-gray-700">Works best for Condition, Drug and Observation domains</span>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                <span className="text-sm text-gray-700">Ideal for conditions, drugs, observations</span>
+                <span className="text-sm text-gray-700">Complete hierarchy with all descendants</span>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
@@ -123,11 +123,11 @@ export default function Landing({ onSelectWorkflow, connectionStatus, errorMessa
             <div className="space-y-2 mb-4">
               <div className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                <span className="text-sm text-gray-700">Quick results - no hierarchy processing</span>
+                <span className="text-sm text-gray-700">Works best for Procedure, Measurement and Device domains</span>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                <span className="text-sm text-gray-700">Perfect for procedures, measurements, devices</span>
+                <span className="text-sm text-gray-700">Quick results - no hierarchy processing</span>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
