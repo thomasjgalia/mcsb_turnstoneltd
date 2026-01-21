@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { PackageCheck, Loader2, AlertCircle, Download, Copy, CheckCircle, RotateCcw, ArrowLeft, Plus, ChevronDown, ChevronRight, Save, X } from 'lucide-react';
 import { buildCodeSet, exportToTxt, exportToSql, saveCodeSet } from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -28,7 +27,6 @@ export default function Step3CodeSet({
   lastSearchTerm,
   lastSearchDomain,
 }: Step3CodeSetProps) {
-  const location = useLocation();
   const [results, setResults] = useState<CodeSetResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +41,6 @@ export default function Step3CodeSet({
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [selectedAttribute, setSelectedAttribute] = useState<string>('');
   const [selectedValue, setSelectedValue] = useState<string>('');
-  const [selectedClass, setSelectedClass] = useState<string>('');
   // Initialize build type from workflow prop (direct workflow = direct build, hierarchical workflow = hierarchical build)
   const [buildType, setBuildType] = useState<'hierarchical' | 'direct'>(
     workflow === 'direct' ? 'direct' : 'hierarchical'

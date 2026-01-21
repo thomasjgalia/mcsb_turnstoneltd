@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabase';
-import { checkHealth, upsertUserProfile } from './lib/api';
+import { upsertUserProfile } from './lib/api';
 import type { User } from '@supabase/supabase-js';
 import type { CartItem, SearchResult, DomainType } from './lib/types';
 
@@ -21,8 +21,6 @@ function AppContent() {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dbWarming, setDbWarming] = useState(false);
-  const [dbReady, setDbReady] = useState(false);
   const [workflow, setWorkflow] = useState<'direct' | 'hierarchical' | null>(null);
   const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3>(0);
   const [shoppingCart, setShoppingCart] = useState<CartItem[]>([]);
