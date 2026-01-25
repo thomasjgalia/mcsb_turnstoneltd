@@ -48,7 +48,8 @@ async function getPool(): Promise<sql.ConnectionPool> {
     return pool;
   } catch (error) {
     console.error('❌ Azure SQL connection error:', error);
-    throw error;
+    const message = error instanceof Error ? error.message : 'Failed to connect to Azure SQL database';
+    throw new Error(`Database connection failed: ${message}`);
   }
 }
 
@@ -87,7 +88,8 @@ export async function executeQuery<T>(
     console.error('❌ Query execution error:', error);
     console.error('Query:', query);
     console.error('Params:', params);
-    throw error;
+    const message = error instanceof Error ? error.message : 'Query execution failed';
+    throw new Error(`Database query failed: ${message}`);
   }
 }
 

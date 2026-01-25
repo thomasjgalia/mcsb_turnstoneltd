@@ -102,7 +102,8 @@ async function handleUpsertProfile(
     return res.status(200).json(createSuccessResponse(profile));
   } catch (error) {
     console.error('Failed to upsert user profile:', error);
-    throw error;
+    const message = error instanceof Error ? error.message : 'Failed to upsert user profile';
+    throw new Error(message);
   }
 }
 
@@ -146,6 +147,7 @@ async function handleGetProfile(
     return res.status(200).json(createSuccessResponse(profile));
   } catch (error) {
     console.error('Failed to get user profile:', error);
-    throw error;
+    const message = error instanceof Error ? error.message : 'Failed to get user profile';
+    throw new Error(message);
   }
 }
