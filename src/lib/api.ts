@@ -16,8 +16,8 @@ import type {
   GetCodeSetsResponse,
   GetCodeSetDetailResponse,
   SearchHistoryRecord,
-  UMLSSearchRequest,
-  UMLSSearchResponse,
+  // UMLSSearchRequest, // Archived
+  // UMLSSearchResponse, // Archived
   LabTestSearchRequest,
   LabTestSearchResult,
   LabTestPanelSearchResult,
@@ -430,62 +430,62 @@ export const getSearchHistory = async (
 };
 
 // ============================================================================
-// OpenAI Chat Assistant
+// OpenAI Chat Assistant (ARCHIVED - API endpoint moved to api/archived/)
 // ============================================================================
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+// export interface ChatMessage {
+//   role: 'system' | 'user' | 'assistant';
+//   content: string;
+// }
 
-export interface ChatResponse {
-  message: string;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
+// export interface ChatResponse {
+//   message: string;
+//   usage?: {
+//     prompt_tokens: number;
+//     completion_tokens: number;
+//     total_tokens: number;
+//   };
+// }
 
-/**
- * Send a message to the OpenAI chat assistant
- */
-export const sendChatMessage = async (
-  messages: ChatMessage[]
-): Promise<string> => {
-  const response = await apiClient.post<ApiResponse<ChatResponse>>(
-    '/api/chat',
-    { messages }
-  );
+// /**
+//  * Send a message to the OpenAI chat assistant
+//  */
+// export const sendChatMessage = async (
+//   messages: ChatMessage[]
+// ): Promise<string> => {
+//   const response = await apiClient.post<ApiResponse<ChatResponse>>(
+//     '/api/chat',
+//     { messages }
+//   );
 
-  if (!response.data.success || !response.data.data) {
-    throw new Error('Invalid chat response');
-  }
+//   if (!response.data.success || !response.data.data) {
+//     throw new Error('Invalid chat response');
+//   }
 
-  return response.data.data.message;
-};
+//   return response.data.data.message;
+// };
 
 // ============================================================================
-// UMLS Search
+// UMLS Search (ARCHIVED - API endpoint moved to api/archived/)
 // ============================================================================
 
-/**
- * Search UMLS (Unified Medical Language System) for medical terms
- */
-export const searchUMLS = async (
-  request: UMLSSearchRequest
-): Promise<UMLSSearchResponse> => {
-  try {
-    const response = await apiClient.post<ApiResponse<UMLSSearchResponse>>(
-      '/api/umls-search',
-      request
-    );
+// /**
+//  * Search UMLS (Unified Medical Language System) for medical terms
+//  */
+// export const searchUMLS = async (
+//   request: UMLSSearchRequest
+// ): Promise<UMLSSearchResponse> => {
+//   try {
+//     const response = await apiClient.post<ApiResponse<UMLSSearchResponse>>(
+//       '/api/umls-search',
+//       request
+//     );
 
-    if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.error || 'UMLS search failed');
-    }
+//     if (!response.data.success || !response.data.data) {
+//       throw new Error(response.data.error || 'UMLS search failed');
+//     }
 
-    return response.data.data;
-  } catch (error) {
-    return handleApiError(error);
-  }
-};
+//     return response.data.data;
+//   } catch (error) {
+//     return handleApiError(error);
+//   }
+// };
