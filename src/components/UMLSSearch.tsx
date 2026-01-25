@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, X, Loader2, BookOpen, Copy, Check, ExternalLink, Save, CheckCircle } from 'lucide-react';
-import { searchUMLS, saveCodeSet } from '../lib/api';
+// ARCHIVED: API endpoint moved to api/archived/umls-search.ts
+// import { searchUMLS, saveCodeSet } from '../lib/api';
+import { saveCodeSet } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import SaveCodeSetModal from './SaveCodeSetModal';
 import type { UMLSSearchResult, SavedUMLSConcept, UMLSCodeSetMetadata } from '../lib/types';
@@ -57,17 +59,19 @@ export default function UMLSSearch() {
     setResults([]);
 
     try {
-      const response = await searchUMLS({
-        searchTerm: searchTerm.trim(),
-        vocabularies: selectedVocabs.length > 0 ? selectedVocabs : undefined,
-        pageSize: 25,
-      });
+      // ARCHIVED: API endpoint moved to api/archived/umls-search.ts
+      // const response = await searchUMLS({
+      //   searchTerm: searchTerm.trim(),
+      //   vocabularies: selectedVocabs.length > 0 ? selectedVocabs : undefined,
+      //   pageSize: 25,
+      // });
+      // setResults(response.results);
+      // if (response.results.length === 0) {
+      //   setError('No results found. Try different search terms or vocabulary filters.');
+      // }
 
-      setResults(response.results);
-
-      if (response.results.length === 0) {
-        setError('No results found. Try different search terms or vocabulary filters.');
-      }
+      setResults([]);
+      setError('UMLS search feature is currently unavailable.');
     } catch (err) {
       console.error('UMLS search error:', err);
       setError(err instanceof Error ? err.message : 'Search failed. Please try again.');

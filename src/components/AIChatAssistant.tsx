@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Loader2, RotateCcw } from 'lucide-react';
-import { sendChatMessage, type ChatMessage } from '../lib/api';
+// ARCHIVED: API endpoint moved to api/archived/chat.ts
+// import { sendChatMessage, type ChatMessage } from '../lib/api';
+
+// Temporary types for archived component
+type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string; };
 
 export default function AIChatAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -35,8 +39,9 @@ export default function AIChatAssistant() {
     setLoading(true);
 
     try {
-      // Send all messages to maintain conversation context
-      const response = await sendChatMessage([...messages, userMessage]);
+      // ARCHIVED: API endpoint moved to api/archived/chat.ts
+      // const response = await sendChatMessage([...messages, userMessage]);
+      const response = 'Chat feature is currently unavailable.';
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
