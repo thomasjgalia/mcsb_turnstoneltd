@@ -48,7 +48,7 @@ export default function Step1Search({
   const [results, setResults] = useState<SearchResult[]>(searchResults);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedVocabulary, setSelectedVocabulary] = useState<string>('');
+  const [selectedVocabularies, setSelectedVocabularies] = useState<Set<string>>(new Set());
   const [selectedConceptClass, setSelectedConceptClass] = useState<string>('');
   const [textFilter, setTextFilter] = useState<string>('');
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -70,7 +70,7 @@ export default function Step1Search({
     setLoading(true);
     setError(null);
     setResults([]);
-    setSelectedVocabulary('');
+    setSelectedVocabularies(new Set());
     setSelectedConceptClass('');
 
     try {
@@ -219,7 +219,7 @@ export default function Step1Search({
 
   // Filter results based on selections and text filter
   let filteredResults = results.filter((result) => {
-    if (selectedVocabulary && result.searched_vocabulary !== selectedVocabulary) {
+    if (selectedVocabularies.size > 0 && !selectedVocabularies.has(result.searched_vocabulary)) {
       return false;
     }
     if (selectedConceptClass && result.searched_concept_class_id !== selectedConceptClass) {
@@ -254,7 +254,7 @@ export default function Step1Search({
 
   // Clear all filters
   const clearFilters = () => {
-    setSelectedVocabulary('');
+    setSelectedVocabularies(new Set());
     setSelectedConceptClass('');
     setTextFilter('');
     setSortField(null);
@@ -269,7 +269,7 @@ export default function Step1Search({
     setSearchResults([]);
     setLastSearchTerm('');
     setLastSearchDomain('');
-    setSelectedVocabulary('');
+    setSelectedVocabularies(new Set());
     setSelectedConceptClass('');
     setTextFilter('');
     setSortField(null);
@@ -421,7 +421,7 @@ export default function Step1Search({
                         title="Auto-filters after 2 characters"
                       />
 
-                      {(selectedVocabulary || selectedConceptClass || textFilter || sortField) && (
+                      {(selectedVocabularies.size > 0 || selectedConceptClass || textFilter || sortField) && (
                         <button
                           onClick={clearFilters}
                           className="text-xs text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap"
@@ -441,9 +441,9 @@ export default function Step1Search({
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-medium text-gray-700">Vocabulary:</span>
                         <button
-                          onClick={() => setSelectedVocabulary('')}
+                          onClick={() => setSelectedVocabularies(new Set())}
                           className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
-                            selectedVocabulary === ''
+                            selectedVocabularies.size === 0
                               ? 'bg-primary-600 text-white'
                               : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                           }`}
@@ -452,12 +452,21 @@ export default function Step1Search({
                         </button>
                         {availableVocabularies.map((vocab) => {
                           const count = results.filter((r) => r.searched_vocabulary === vocab).length;
+                          const isSelected = selectedVocabularies.has(vocab);
                           return (
                             <button
                               key={vocab}
-                              onClick={() => setSelectedVocabulary(vocab)}
+                              onClick={() => {
+                                const newSet = new Set(selectedVocabularies);
+                                if (isSelected) {
+                                  newSet.delete(vocab);
+                                } else {
+                                  newSet.add(vocab);
+                                }
+                                setSelectedVocabularies(newSet);
+                              }}
                               className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
-                                selectedVocabulary === vocab
+                                isSelected
                                   ? 'bg-primary-600 text-white'
                                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                               }`}

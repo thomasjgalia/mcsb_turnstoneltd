@@ -22,8 +22,8 @@ import labtestSearchHandler from './api/labtest-search.js';
 import labtestPanelSearchHandler from './api/labtest-panel-search.js';
 import hierarchyHandler from './api/hierarchy.js';
 import codesetHandler from './api/codeset.js';
-import chatHandler from './api/chat.js';
-import umlsSearchHandler from './api/umls-search.js';
+// Archived: import chatHandler from './api/chat.js';
+// Archived: import umlsSearchHandler from './api/umls-search.js';
 import profileHandler from './api/user/profile.js';
 import codesetsHandler from './api/user/codesets.js';
 import searchHistoryHandler from './api/user/search-history.js';
@@ -70,8 +70,8 @@ app.post('/api/labtest-search', vercelToExpress(labtestSearchHandler));
 app.post('/api/labtest-panel-search', vercelToExpress(labtestPanelSearchHandler));
 app.post('/api/hierarchy', vercelToExpress(hierarchyHandler));
 app.post('/api/codeset', vercelToExpress(codesetHandler));
-app.post('/api/chat', vercelToExpress(chatHandler));
-app.post('/api/umls-search', vercelToExpress(umlsSearchHandler));
+// Archived: app.post('/api/chat', vercelToExpress(chatHandler));
+// Archived: app.post('/api/umls-search', vercelToExpress(umlsSearchHandler));
 
 // User API Routes
 app.post('/api/user/profile', vercelToExpress(profileHandler));

@@ -464,7 +464,7 @@ export default function Step3CodeSet({
       {!loading && results.length > 0 && (
         <>
           {/* Combined Filters Panel */}
-          {(availableVocabularies.length > 1 || availableAttributes.length > 0) && (
+          {(availableVocabularies.length > 1 || (availableAttributes.length > 0 && results.some((r) => r.value))) && (
             <div className="card p-3">
               <div className="flex gap-4">
                 {/* Vocabulary Filter */}
@@ -515,8 +515,8 @@ export default function Step3CodeSet({
                   </div>
                 )}
 
-                {/* Attribute Filter (if attributes exist) */}
-                {availableAttributes.length > 0 && (
+                {/* Attribute Filter (only show if values actually exist in the results) */}
+                {availableAttributes.length > 0 && results.some((r) => r.value) && (
                   <div className="flex-1">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2">
                       Filter by Attribute
@@ -677,8 +677,7 @@ export default function Step3CodeSet({
                       {vocabResults[0]?.combinationyesno && <th className="text-xs py-1.5">Combo</th>}
                       {vocabResults[0]?.dose_form && <th className="text-xs py-1.5">Dose Form</th>}
                       {vocabResults[0]?.dfg_name && <th className="text-xs py-1.5">DFG Category</th>}
-                      {vocabResults.some((r) => r.concept_attribute) && <th className="text-xs py-1.5">Attribute</th>}
-                      {vocabResults.some((r) => r.value) && <th className="text-xs py-1.5">Value</th>}
+                      {vocabResults.some((r) => r.value) && <th className="text-xs py-1.5">Attribute</th>}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -724,9 +723,6 @@ export default function Step3CodeSet({
                               {result.dfg_name}
                             </span>
                           </td>
-                        )}
-                        {vocabResults.some((r) => r.concept_attribute) && (
-                          <td className="text-xs text-gray-600 py-1.5 px-2">{result.concept_attribute || '-'}</td>
                         )}
                         {vocabResults.some((r) => r.value) && (
                           <td className="text-xs text-gray-600 py-1.5 px-2">{result.value || '-'}</td>

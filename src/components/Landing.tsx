@@ -22,24 +22,32 @@ export default function Landing({ onSelectWorkflow, connectionStatus, errorMessa
         </div>
 
         {/* Connection Status */}
-        <div className="mb-8 flex items-center justify-center gap-2">
+        <div className="mb-8">
           {connectionStatus === 'connecting' && (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              <span className="text-sm text-gray-600">Connecting to database...</span>
-            </>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">Connecting to database...</span>
+              </div>
+              <p className="text-xs text-center text-blue-700">
+                Initial connection may take up to 2 minutes if the database is starting from a cold state.
+              </p>
+            </div>
           )}
           {connectionStatus === 'connected' && (
-            <>
+            <div className="flex items-center justify-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-sm text-green-700">Database connected</span>
-            </>
+              <span className="text-sm text-green-700 font-medium">Database connected - Ready to build!</span>
+            </div>
           )}
           {connectionStatus === 'error' && (
-            <>
-              <AlertCircle className="w-4 h-4 text-red-600" />
-              <span className="text-sm text-red-700">{errorMessage}</span>
-            </>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-2xl mx-auto">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <span className="text-sm font-medium text-red-900">Connection Error</span>
+              </div>
+              <p className="text-xs text-center text-red-700">{errorMessage}</p>
+            </div>
           )}
         </div>
 
@@ -49,16 +57,14 @@ export default function Landing({ onSelectWorkflow, connectionStatus, errorMessa
           <button
             onClick={() => onSelectWorkflow('hierarchical')}
             disabled={connectionStatus !== 'connected'}
-            className="group relative bg-white rounded-lg border-2 border-gray-200 p-8 text-left transition-all hover:border-primary-500 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:shadow-none"
+            className="group relative bg-white rounded-lg border-2 border-gray-200 p-8 text-left transition-all hover:border-primary-500 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:shadow-none min-h-[580px] flex flex-col"
           >
-            <div className="flex items-start gap-4 mb-4">
+            <div className="flex items-center gap-4 mb-4">
               <div className="flex-shrink-0 w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center group-hover:bg-primary-200 transition-colors">
                 <PackageCheck className="w-6 h-6 text-primary-600" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Hierarchical Build
-                </h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-1 leading-none mt-0">Hierarchical Build</h3>
                 <span className="inline-block px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded">
                   Comprehensive
                 </span>
@@ -99,16 +105,14 @@ export default function Landing({ onSelectWorkflow, connectionStatus, errorMessa
           <button
             onClick={() => onSelectWorkflow('direct')}
             disabled={connectionStatus !== 'connected'}
-            className="group relative bg-white rounded-lg border-2 border-gray-200 p-8 text-left transition-all hover:border-primary-500 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:shadow-none"
+            className="group relative bg-white rounded-lg border-2 border-gray-200 p-8 text-left transition-all hover:border-primary-500 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:shadow-none min-h-[580px] flex flex-col"
           >
-            <div className="flex items-start gap-4 mb-4">
+            <div className="flex items-center gap-4 mb-4">
               <div className="flex-shrink-0 w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center group-hover:bg-primary-200 transition-colors">
                 <Zap className="w-6 h-6 text-primary-600" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Direct Build
-                </h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-1 leading-none mt-0">Direct Build</h3>
                 <span className="inline-block px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded">
                   Fast & Precise
                 </span>
@@ -149,16 +153,14 @@ export default function Landing({ onSelectWorkflow, connectionStatus, errorMessa
           <button
             onClick={() => onSelectWorkflow('labtest')}
             disabled={connectionStatus !== 'connected'}
-            className="group relative bg-white rounded-lg border-2 border-gray-200 p-8 text-left transition-all hover:border-primary-500 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:shadow-none"
+            className="group relative bg-white rounded-lg border-2 border-gray-200 p-8 text-left transition-all hover:border-primary-500 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:shadow-none min-h-[580px] flex flex-col"
           >
-            <div className="flex items-start gap-4 mb-4">
+            <div className="flex items-center gap-4 mb-4">
               <div className="flex-shrink-0 w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center group-hover:bg-primary-200 transition-colors">
                 <FlaskConical className="w-6 h-6 text-primary-600" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Lab Test Build
-                </h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-1 leading-none mt-0">Lab Test Build</h3>
                 <span className="inline-block px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded">
                   Lab Focused
                 </span>

@@ -78,8 +78,22 @@ export const checkHealth = async (): Promise<{
   }
 };
 
-// Alias for checkHealth - used for testing connection on Landing page
-export const testConnection = checkHealth;
+// Test connection with extended timeout for initial database warmup
+// This is used on the Landing page where Azure SQL cold starts can take 60-120 seconds
+export const testConnection = async (): Promise<{
+  success: boolean;
+  duration_ms?: number;
+  message?: string;
+}> => {
+  try {
+    const response = await apiClient.get('/api/health', {
+      timeout: 180000, // 3 minutes (180 seconds) for initial cold start
+    });
+    return response.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
 
 // ============================================================================
 // Step 1: Search Query
