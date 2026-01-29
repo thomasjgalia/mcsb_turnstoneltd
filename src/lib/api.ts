@@ -87,7 +87,7 @@ export const testConnection = async (): Promise<{
 }> => {
   try {
     const response = await apiClient.get('/api/health', {
-      timeout: 180000, // 3 minutes (180 seconds) for initial cold start
+      timeout: 300000, // 5 minutes (300 seconds) for initial cold start
     });
     return response.data;
   } catch (error) {
