@@ -154,9 +154,17 @@ export default function Step1LabTestSearch({
     [results]
   );
 
+  // Cascading filters: Filter results by vocabulary first, then calculate available options
+  const vocabularyFilteredResults = useMemo(() => {
+    if (selectedVocabularies.size === 0) {
+      return results;
+    }
+    return results.filter((r) => selectedVocabularies.has(r.vocabulary_id));
+  }, [results, selectedVocabularies]);
+
   const availableScaleLabels = useMemo(() => {
     const scales = new Map<string, Set<string>>();
-    results.forEach((r) => {
+    vocabularyFilteredResults.forEach((r) => {
       if (r.scale) {
         const label = scaleToLabel.get(r.scale) || r.scale;
         if (!scales.has(label)) {
@@ -166,11 +174,11 @@ export default function Step1LabTestSearch({
       }
     });
     return scales;
-  }, [results, scaleToLabel]);
+  }, [vocabularyFilteredResults, scaleToLabel]);
 
   const availableSystemCategories = useMemo(() => {
     const categories = new Map<string, Set<string>>();
-    results.forEach((r) => {
+    vocabularyFilteredResults.forEach((r) => {
       if (r.system) {
         const category = systemToCategory.get(r.system) || 'Unknown / Other';
         if (!categories.has(category)) {
@@ -180,11 +188,11 @@ export default function Step1LabTestSearch({
       }
     });
     return categories;
-  }, [results, systemToCategory]);
+  }, [vocabularyFilteredResults, systemToCategory]);
 
   const availableTimeBuckets = useMemo(() => {
     const buckets = new Map<string, Set<string>>();
-    results.forEach((r) => {
+    vocabularyFilteredResults.forEach((r) => {
       if (r.time) {
         const bucket = timeToBucket.get(r.time) || 'Unspecified / Other';
         if (!buckets.has(bucket)) {
@@ -194,7 +202,7 @@ export default function Step1LabTestSearch({
       }
     });
     return buckets;
-  }, [results, timeToBucket]);
+  }, [vocabularyFilteredResults, timeToBucket]);
 
   // Apply filters
   let filteredResults = results.filter((result) => {
@@ -338,7 +346,7 @@ export default function Step1LabTestSearch({
     }
   };
 
-  // Toggle pill selection
+  // Toggle pill selection with cascading clear
   const togglePill = (set: Set<string>, value: string, setter: (s: Set<string>) => void) => {
     const newSet = new Set(set);
     if (newSet.has(value)) {
@@ -347,6 +355,41 @@ export default function Step1LabTestSearch({
       newSet.add(value);
     }
     setter(newSet);
+
+    // Clear dependent filters when vocabulary changes
+    if (setter === setSelectedVocabularies) {
+      // Check if selected scale/system/time are still available after vocabulary change
+      const newVocabFiltered = results.filter((r) =>
+        newSet.size === 0 || newSet.has(r.vocabulary_id)
+      );
+
+      // Clear scale if not available
+      if (selectedScaleType) {
+        const stillAvailable = newVocabFiltered.some((r) => {
+          const label = scaleToLabel.get(r.scale || '') || r.scale;
+          return label === selectedScaleType;
+        });
+        if (!stillAvailable) setSelectedScaleType('');
+      }
+
+      // Clear system if not available
+      if (selectedSystemCategory) {
+        const stillAvailable = newVocabFiltered.some((r) => {
+          const category = systemToCategory.get(r.system || '') || 'Unknown / Other';
+          return category === selectedSystemCategory;
+        });
+        if (!stillAvailable) setSelectedSystemCategory('');
+      }
+
+      // Clear time if not available
+      if (selectedTimeBucket) {
+        const stillAvailable = newVocabFiltered.some((r) => {
+          const bucket = timeToBucket.get(r.time || '') || 'Unspecified / Other';
+          return bucket === selectedTimeBucket;
+        });
+        if (!stillAvailable) setSelectedTimeBucket('');
+      }
+    }
   };
 
   // Clear all filters
@@ -517,7 +560,7 @@ export default function Step1LabTestSearch({
                     <option value="">All Scales</option>
                     {Array.from(availableScaleLabels.keys()).sort().map((label) => {
                       const scales = availableScaleLabels.get(label)!;
-                      const count = results.filter((r) => r.scale && scales.has(r.scale)).length;
+                      const count = vocabularyFilteredResults.filter((r) => r.scale && scales.has(r.scale)).length;
                       return (
                         <option key={label} value={label}>
                           {label} ({count})
@@ -537,7 +580,7 @@ export default function Step1LabTestSearch({
                     <option value="">All Systems</option>
                     {Array.from(availableSystemCategories.keys()).sort().map((category) => {
                       const systems = availableSystemCategories.get(category)!;
-                      const count = results.filter((r) => r.system && systems.has(r.system)).length;
+                      const count = vocabularyFilteredResults.filter((r) => r.system && systems.has(r.system)).length;
                       return (
                         <option key={category} value={category}>
                           {category} ({count})
@@ -557,7 +600,7 @@ export default function Step1LabTestSearch({
                     <option value="">All Time Aspects</option>
                     {Array.from(availableTimeBuckets.keys()).sort().map((bucket) => {
                       const times = availableTimeBuckets.get(bucket)!;
-                      const count = results.filter((r) => r.time && times.has(r.time)).length;
+                      const count = vocabularyFilteredResults.filter((r) => r.time && times.has(r.time)).length;
                       return (
                         <option key={bucket} value={bucket}>
                           {bucket} ({count})

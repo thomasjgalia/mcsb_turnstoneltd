@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PackageCheck, Loader2, AlertCircle, Download, Copy, CheckCircle, RotateCcw, ArrowLeft, Plus, ChevronDown, ChevronRight, Save, X } from 'lucide-react';
 import { buildCodeSet, exportToTxt, exportToSql, saveCodeSet } from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -47,6 +47,11 @@ export default function Step3CodeSet({
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [selectedAttribute, setSelectedAttribute] = useState<string>('');
   const [selectedValue, setSelectedValue] = useState<string>('');
+  // Drug-specific filters (multi-select)
+  const [selectedCombos, setSelectedCombos] = useState<Set<string>>(new Set());
+  const [selectedDoseForms, setSelectedDoseForms] = useState<Set<string>>(new Set());
+  const [selectedDfgCategories, setSelectedDfgCategories] = useState<Set<string>>(new Set());
+  const [isFiltering, setIsFiltering] = useState(false);
   // Initialize build type from workflow prop (direct workflow = direct build, hierarchical workflow = hierarchical build, labtest workflow = labtest build)
   const [buildType, setBuildType] = useState<'hierarchical' | 'direct' | 'labtest'>(
     workflow === 'direct' ? 'direct' : workflow === 'labtest' ? 'labtest' : 'hierarchical'
@@ -123,22 +128,38 @@ export default function Step3CodeSet({
         throw new Error('Not authenticated');
       }
 
-      // Convert built code set results to SavedCodeSetConcept format
-      // We need to save the full built code set, not just the shopping cart
-      const conceptsToSave = filteredResults.map(result => ({
-        hierarchy_concept_id: result.child_concept_id,
-        concept_name: result.child_name,
-        vocabulary_id: result.child_vocabulary_id,
-        concept_class_id: result.concept_class_id,
-        root_term: result.root_concept_name,
-        domain_id: shoppingCart[0]?.domain_id || 'Condition', // Use domain from cart
-      }));
+      // Hybrid approach: For large code sets (>=500), save only anchor concepts
+      // For small code sets, save all built concepts
+      const LARGE_CODESET_THRESHOLD = 500;
+      const isLargeCodeSet = filteredResults.length >= LARGE_CODESET_THRESHOLD;
+
+      const conceptsToSave = isLargeCodeSet
+        ? // Large code set: Save only anchor concepts (shopping cart items)
+          shoppingCart.map(item => ({
+            hierarchy_concept_id: item.hierarchy_concept_id,
+            concept_name: item.concept_name,
+            vocabulary_id: item.vocabulary_id,
+            concept_class_id: item.concept_class_id,
+            root_term: item.concept_name, // Root concept is itself
+            domain_id: item.domain_id,
+          }))
+        : // Small code set: Save all built concepts
+          filteredResults.map(result => ({
+            hierarchy_concept_id: result.child_concept_id,
+            concept_name: result.child_name,
+            vocabulary_id: result.child_vocabulary_id,
+            concept_class_id: result.concept_class_id,
+            root_term: result.root_concept_name,
+            domain_id: shoppingCart[0]?.domain_id || 'Condition',
+          }));
 
       console.log('💾 Saving code set:', {
         userId: session.user.id,
         name,
         description,
-        conceptCount: conceptsToSave.length,
+        isLargeCodeSet,
+        totalBuiltConcepts: filteredResults.length,
+        conceptsToSaveCount: conceptsToSave.length,
         rootConceptsInCart: shoppingCart.length,
         buildType: buildType,
         workflow: workflow,
@@ -146,12 +167,20 @@ export default function Step3CodeSet({
         lastConcept: conceptsToSave[conceptsToSave.length - 1],
       });
 
-      // Save the built code set (all descendant codes)
+      // Save the code set
       const saveResult = await saveCodeSet(session.user.id, {
         code_set_name: name,
         description: description || `Saved on ${new Date().toLocaleDateString()}`,
         concepts: conceptsToSave,
+        total_concepts: filteredResults.length, // Always pass the full built count
         source_type: 'OMOP',
+        // Hybrid storage fields for large code sets
+        build_type: buildType,
+        anchor_concept_ids: shoppingCart.map(item => item.hierarchy_concept_id),
+        build_parameters: {
+          combo_filter: comboFilter,
+          domain_id: lastSearchDomain,
+        },
       });
 
       console.log('✅ Code set saved successfully:', saveResult);
@@ -168,56 +197,148 @@ export default function Step3CodeSet({
     }
   };
 
-  // Get unique vocabularies from results
-  const availableVocabularies = Array.from(
-    new Set(results.map((r) => r.child_vocabulary_id))
-  ).sort();
+  // Memoize available filter options (only recalculate when results change)
+  const availableVocabularies = useMemo(() =>
+    Array.from(new Set(results.map((r) => r.child_vocabulary_id))).sort(),
+    [results]
+  );
 
-  // Get unique attributes from results
-  const availableAttributes = Array.from(
-    new Set(results.filter((r) => r.concept_attribute).map((r) => r.concept_attribute as string))
-  ).sort();
+  const availableAttributes = useMemo(() =>
+    Array.from(new Set(results.filter((r) => r.concept_attribute).map((r) => r.concept_attribute as string))).sort(),
+    [results]
+  );
 
-  // Get values for the selected attribute
-  const availableValues = selectedAttribute
-    ? Array.from(
-        new Set(
-          results
-            .filter((r) => r.concept_attribute === selectedAttribute && r.value)
-            .map((r) => r.value as string)
-        )
-      ).sort()
-    : [];
+  const availableValues = useMemo(() =>
+    selectedAttribute
+      ? Array.from(
+          new Set(
+            results
+              .filter((r) => r.concept_attribute === selectedAttribute && r.value)
+              .map((r) => r.value as string)
+          )
+        ).sort()
+      : [],
+    [results, selectedAttribute]
+  );
+
+  const availableCombos = useMemo(() =>
+    Array.from(new Set(results.filter((r) => r.combinationyesno).map((r) => r.combinationyesno as string))).sort(),
+    [results]
+  );
+
+  const availableDoseForms = useMemo(() =>
+    Array.from(new Set(results.filter((r) => r.dose_form).map((r) => r.dose_form as string))).sort(),
+    [results]
+  );
+
+  const availableDfgCategories = useMemo(() =>
+    Array.from(new Set(results.filter((r) => r.dfg_name).map((r) => r.dfg_name as string))).sort(),
+    [results]
+  );
 
   // Reset selected value when attribute changes
   useEffect(() => {
     setSelectedValue('');
   }, [selectedAttribute]);
 
-  // Filter results based on selected vocabularies and attribute/value
-  const visibleResults = results
-    .filter((r) => selectedVocabularies.size === 0 || selectedVocabularies.has(r.child_vocabulary_id))
-    .filter((r) => {
-      // If attribute filter is not active, show all results
-      if (!selectedAttribute || !selectedValue) {
-        return true;
-      }
-      // If attribute filter is active, only show matching results
-      return r.concept_attribute === selectedAttribute && r.value === selectedValue;
-    });
-
-  // Filter for export (exclude unchecked codes)
-  const filteredResults = visibleResults
-    .filter((r) => !excludedCodes.has(`${r.child_vocabulary_id}:${r.child_code}`));
-
-  // Group visible results by vocabulary (includes excluded codes for display)
-  const groupedResults = visibleResults.reduce((acc, result) => {
-    if (!acc[result.child_vocabulary_id]) {
-      acc[result.child_vocabulary_id] = [];
+  // Show filtering indicator when filters change
+  useEffect(() => {
+    if (results.length > 500) {
+      setIsFiltering(true);
+      const timer = setTimeout(() => setIsFiltering(false), 1500);
+      return () => clearTimeout(timer);
     }
-    acc[result.child_vocabulary_id].push(result);
-    return acc;
-  }, {} as Record<string, CodeSetResult[]>);
+  }, [selectedVocabularies, selectedAttribute, selectedValue, selectedCombos, selectedDoseForms, selectedDfgCategories, results.length]);
+
+  // Optimized filtering: combine all filters into single pass (memoized)
+  const visibleResults = useMemo(() => {
+    return results.filter((r) => {
+      // Vocabulary filter
+      if (selectedVocabularies.size > 0 && !selectedVocabularies.has(r.child_vocabulary_id)) {
+        return false;
+      }
+
+      // Attribute filter
+      if (selectedAttribute && selectedValue) {
+        if (r.concept_attribute !== selectedAttribute || r.value !== selectedValue) {
+          return false;
+        }
+      }
+
+      // Combo filter
+      if (selectedCombos.size > 0 && (!r.combinationyesno || !selectedCombos.has(r.combinationyesno))) {
+        return false;
+      }
+
+      // Dose form filter
+      if (selectedDoseForms.size > 0 && (!r.dose_form || !selectedDoseForms.has(r.dose_form))) {
+        return false;
+      }
+
+      // DFG category filter
+      if (selectedDfgCategories.size > 0 && (!r.dfg_name || !selectedDfgCategories.has(r.dfg_name))) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [results, selectedVocabularies, selectedAttribute, selectedValue, selectedCombos, selectedDoseForms, selectedDfgCategories]);
+
+  // Filter for export (exclude unchecked codes) - memoized
+  const filteredResults = useMemo(() =>
+    visibleResults.filter((r) => !excludedCodes.has(`${r.child_vocabulary_id}:${r.child_code}`)),
+    [visibleResults, excludedCodes]
+  );
+
+  // Memoize count maps for filter options (prevents recalculating on every render)
+  const comboCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    results.forEach((r) => {
+      if (r.combinationyesno) {
+        counts.set(r.combinationyesno, (counts.get(r.combinationyesno) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [results]);
+
+  const doseFormCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    results.forEach((r) => {
+      if (r.dose_form) {
+        counts.set(r.dose_form, (counts.get(r.dose_form) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [results]);
+
+  const dfgCategoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    results.forEach((r) => {
+      if (r.dfg_name) {
+        counts.set(r.dfg_name, (counts.get(r.dfg_name) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [results]);
+
+  const vocabularyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    results.forEach((r) => {
+      counts.set(r.child_vocabulary_id, (counts.get(r.child_vocabulary_id) || 0) + 1);
+    });
+    return counts;
+  }, [results]);
+
+  // Group visible results by vocabulary (includes excluded codes for display) - memoized
+  const groupedResults = useMemo(() => {
+    return visibleResults.reduce((acc, result) => {
+      if (!acc[result.child_vocabulary_id]) {
+        acc[result.child_vocabulary_id] = [];
+      }
+      acc[result.child_vocabulary_id].push(result);
+      return acc;
+    }, {} as Record<string, CodeSetResult[]>);
+  }, [visibleResults]);
 
   // Toggle vocabulary filter
   const toggleVocabulary = (vocab: string) => {
@@ -238,6 +359,44 @@ export default function Step3CodeSet({
   // Clear all vocabulary selections
   const clearAllVocabularies = () => {
     setSelectedVocabularies(new Set());
+  };
+
+  // Clear all drug filters
+  const clearAllDrugFilters = () => {
+    setSelectedCombos(new Set());
+    setSelectedDoseForms(new Set());
+    setSelectedDfgCategories(new Set());
+  };
+
+  // Toggle drug filter selections
+  const toggleCombo = (combo: string) => {
+    const newSelected = new Set(selectedCombos);
+    if (newSelected.has(combo)) {
+      newSelected.delete(combo);
+    } else {
+      newSelected.add(combo);
+    }
+    setSelectedCombos(newSelected);
+  };
+
+  const toggleDoseForm = (doseForm: string) => {
+    const newSelected = new Set(selectedDoseForms);
+    if (newSelected.has(doseForm)) {
+      newSelected.delete(doseForm);
+    } else {
+      newSelected.add(doseForm);
+    }
+    setSelectedDoseForms(newSelected);
+  };
+
+  const toggleDfgCategory = (dfgCategory: string) => {
+    const newSelected = new Set(selectedDfgCategories);
+    if (newSelected.has(dfgCategory)) {
+      newSelected.delete(dfgCategory);
+    } else {
+      newSelected.add(dfgCategory);
+    }
+    setSelectedDfgCategories(newSelected);
   };
 
   // Toggle individual code exclusion
@@ -346,6 +505,12 @@ export default function Step3CodeSet({
                   Back
                 </button>
               )}
+              {(workflow === 'direct' || workflow === 'labtest') && (
+                <button onClick={onBackToSearch} className="btn-secondary flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap">
+                  <ArrowLeft className="w-3 h-3" />
+                  Back
+                </button>
+              )}
               <button onClick={onSwitchToHierarchical} className="btn-secondary flex items-center gap-1.5 text-xs px-3 py-1.5 whitespace-nowrap">
                 <Plus className="w-3 h-3" />
                 Add using Hierarchy
@@ -413,37 +578,6 @@ export default function Step3CodeSet({
         </div>
       )}
 
-      {/* Rebuild Button (shown after initial build) */}
-      {hasBuilt && !loading && (
-        <div className="card p-3">
-          <div className="flex gap-4 items-end">
-            {/* Drug Filter (Drug domain only, hierarchical only) */}
-            {shoppingCart.some((item) => item.domain_id === 'Drug') && buildType === 'hierarchical' && (
-              <div className="flex-1">
-                <label htmlFor="comboFilterRebuild" className="block text-xs font-medium text-gray-700 mb-1.5">
-                  Drug Filter
-                </label>
-                <select
-                  id="comboFilterRebuild"
-                  value={comboFilter}
-                  onChange={(e) => setComboFilter(e.target.value as ComboFilter)}
-                  className="select-field text-sm w-full"
-                  disabled={loading}
-                >
-                  <option value="ALL">All Drugs</option>
-                  <option value="SINGLE">Single Ingredient Only</option>
-                  <option value="COMBINATION">Combination Drugs Only</option>
-                </select>
-              </div>
-            )}
-
-            <button onClick={buildSet} className="btn-primary text-sm px-4 py-2" disabled={loading}>
-              Rebuild
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Loading State */}
       {loading && (
         <div className="card p-6 text-center">
@@ -464,14 +598,14 @@ export default function Step3CodeSet({
       {!loading && results.length > 0 && (
         <>
           {/* Combined Filters Panel */}
-          {(availableVocabularies.length > 1 || (availableAttributes.length > 0 && results.some((r) => r.value))) && (
+          {(availableVocabularies.length > 1 || (availableAttributes.length > 0 && results.some((r) => r.value)) || availableCombos.length > 0 || availableDoseForms.length > 0 || availableDfgCategories.length > 0) && (
             <div className="card p-3">
-              <div className="flex gap-4">
+              <div className="flex flex-wrap gap-4 items-start">
                 {/* Vocabulary Filter */}
                 {availableVocabularies.length > 1 && (
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-sm font-semibold text-gray-900 whitespace-nowrap">
                         Filter by Vocabulary
                       </h3>
                       <div className="flex gap-2">
@@ -492,7 +626,7 @@ export default function Step3CodeSet({
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {availableVocabularies.map((vocab) => {
-                        const count = results.filter((r) => r.child_vocabulary_id === vocab).length;
+                        const count = vocabularyCounts.get(vocab) || 0;
                         const isSelected = selectedVocabularies.has(vocab);
                         return (
                           <button
@@ -515,9 +649,144 @@ export default function Step3CodeSet({
                   </div>
                 )}
 
+                {/* Combo Filter - Multi-select */}
+                {availableCombos.length > 0 && (
+                  <div className="w-40 flex-shrink-0 relative">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Combination</h3>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="select-field text-xs w-full text-left flex items-center justify-between"
+                        onClick={() => {
+                          const dropdown = document.getElementById('combo-dropdown');
+                          if (dropdown) dropdown.classList.toggle('hidden');
+                        }}
+                      >
+                        <span className="truncate">
+                          {selectedCombos.size === 0 ? 'All' : `${selectedCombos.size} selected`}
+                        </span>
+                        <ChevronDown className="w-3 h-3 ml-1 flex-shrink-0" />
+                      </button>
+                      <div
+                        id="combo-dropdown"
+                        className="hidden absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
+                      >
+                        {availableCombos.map((combo) => {
+                          const count = comboCounts.get(combo) || 0;
+                          const isSelected = selectedCombos.has(combo);
+                          return (
+                            <label
+                              key={combo}
+                              className="flex items-center px-2 py-1.5 hover:bg-gray-50 cursor-pointer text-xs"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleCombo(combo)}
+                                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 mr-2"
+                              />
+                              <span className="flex-1">{combo} ({count})</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dose Form Filter - Multi-select */}
+                {availableDoseForms.length > 0 && (
+                  <div className="w-80 flex-shrink-0 relative">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Dose Form</h3>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="select-field text-xs w-full text-left flex items-center justify-between"
+                        onClick={() => {
+                          const dropdown = document.getElementById('doseform-dropdown');
+                          if (dropdown) dropdown.classList.toggle('hidden');
+                        }}
+                      >
+                        <span className="truncate">
+                          {selectedDoseForms.size === 0 ? 'All' : `${selectedDoseForms.size} selected`}
+                        </span>
+                        <ChevronDown className="w-3 h-3 ml-1 flex-shrink-0" />
+                      </button>
+                      <div
+                        id="doseform-dropdown"
+                        className="hidden absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
+                      >
+                        {availableDoseForms.map((doseForm) => {
+                          const count = doseFormCounts.get(doseForm) || 0;
+                          const isSelected = selectedDoseForms.has(doseForm);
+                          return (
+                            <label
+                              key={doseForm}
+                              className="flex items-center px-2 py-1.5 hover:bg-gray-50 cursor-pointer text-xs"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleDoseForm(doseForm)}
+                                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 mr-2"
+                              />
+                              <span className="flex-1">{doseForm} ({count})</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* DFG Category Filter - Multi-select */}
+                {availableDfgCategories.length > 0 && (
+                  <div className="w-40 flex-shrink-0 relative">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">DFG Category</h3>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="select-field text-xs w-full text-left flex items-center justify-between"
+                        onClick={() => {
+                          const dropdown = document.getElementById('dfg-dropdown');
+                          if (dropdown) dropdown.classList.toggle('hidden');
+                        }}
+                      >
+                        <span className="truncate">
+                          {selectedDfgCategories.size === 0 ? 'All' : `${selectedDfgCategories.size} selected`}
+                        </span>
+                        <ChevronDown className="w-3 h-3 ml-1 flex-shrink-0" />
+                      </button>
+                      <div
+                        id="dfg-dropdown"
+                        className="hidden absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
+                      >
+                        {availableDfgCategories.map((dfg) => {
+                          const count = dfgCategoryCounts.get(dfg) || 0;
+                          const isSelected = selectedDfgCategories.has(dfg);
+                          return (
+                            <label
+                              key={dfg}
+                              className="flex items-center px-2 py-1.5 hover:bg-gray-50 cursor-pointer text-xs"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleDfgCategory(dfg)}
+                                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 mr-2"
+                              />
+                              <span className="flex-1">{dfg} ({count})</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Attribute Filter (only show if values actually exist in the results) */}
                 {availableAttributes.length > 0 && results.some((r) => r.value) && (
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-[400px]">
                     <h3 className="text-sm font-semibold text-gray-900 mb-2">
                       Filter by Attribute
                     </h3>
@@ -565,13 +834,23 @@ export default function Step3CodeSet({
                 )}
               </div>
 
-              <p className="mt-2 text-xs text-gray-500">
-                {selectedAttribute && selectedValue
-                  ? `Filtered to ${visibleResults.length} codes with ${selectedAttribute} = ${selectedValue}`
-                  : selectedVocabularies.size === 0
-                  ? `Showing all ${visibleResults.length} codes`
-                  : `Showing ${visibleResults.length} of ${results.length} codes from ${selectedVocabularies.size} ${selectedVocabularies.size === 1 ? 'vocabulary' : 'vocabularies'}`}
-              </p>
+              <div className="mt-3 flex items-center justify-between">
+                <p className="text-xs text-gray-500">
+                  {selectedAttribute && selectedValue
+                    ? `Filtered to ${visibleResults.length} codes with ${selectedAttribute} = ${selectedValue}`
+                    : selectedVocabularies.size === 0 && selectedCombos.size === 0 && selectedDoseForms.size === 0 && selectedDfgCategories.size === 0
+                    ? `Showing all ${visibleResults.length} codes`
+                    : `Showing ${visibleResults.length} of ${results.length} codes`}
+                </p>
+                {(selectedCombos.size > 0 || selectedDoseForms.size > 0 || selectedDfgCategories.size > 0) && (
+                  <button
+                    onClick={clearAllDrugFilters}
+                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Clear Drug Filters
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -748,6 +1027,17 @@ export default function Step3CodeSet({
         conceptCount={filteredResults.length}
         saving={saving}
       />
+
+      {/* Filtering Modal - Prominent overlay */}
+      {isFiltering && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+          <div className="bg-white rounded-lg shadow-2xl p-6 flex flex-col items-center gap-3">
+            <Loader2 className="w-10 h-10 text-primary-600 animate-spin" />
+            <p className="text-lg font-semibold text-gray-900">Filtering code set...</p>
+            <p className="text-sm text-gray-600">Please wait while we process your filters</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

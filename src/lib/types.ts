@@ -223,8 +223,16 @@ export interface SaveCodeSetRequest {
   code_set_name: string;
   description?: string;
   concepts: SavedCodeSetConcept[] | SavedUMLSConcept[];
+  total_concepts?: number; // Total built concepts (for large code sets, this is the full count, not just anchors)
   source_type: 'OMOP' | 'UMLS';
   source_metadata?: string; // JSON string
+  // Hybrid storage fields (for large code sets)
+  build_type?: 'hierarchical' | 'direct' | 'labtest';
+  anchor_concept_ids?: number[]; // Anchor concepts to rebuild from
+  build_parameters?: {
+    combo_filter?: 'ALL' | 'SINGLE' | 'COMBINATION';
+    domain_id?: string;
+  };
 }
 
 export interface GetCodeSetsResponse {
@@ -234,12 +242,20 @@ export interface GetCodeSetsResponse {
   total_concepts: number;
   source_type: 'OMOP' | 'UMLS';
   source_metadata?: string;
+  is_materialized?: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface GetCodeSetDetailResponse extends GetCodeSetsResponse {
   concepts: SavedCodeSetConcept[] | SavedUMLSConcept[];
+  is_materialized?: boolean; // true = full concepts saved, false = needs rebuild from anchors
+  build_type?: 'hierarchical' | 'direct' | 'labtest';
+  anchor_concept_ids?: number[];
+  build_parameters?: {
+    combo_filter?: 'ALL' | 'SINGLE' | 'COMBINATION';
+    domain_id?: string;
+  };
 }
 
 // ============================================================================

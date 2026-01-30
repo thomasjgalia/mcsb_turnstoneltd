@@ -34,8 +34,16 @@ interface SaveCodeSetRequest {
   code_set_name: string;
   description?: string;
   concepts: SavedCodeSetConcept[] | SavedUMLSConcept[];
+  total_concepts?: number; // Total built concepts (for large code sets, full count not just anchors)
   source_type: 'OMOP' | 'UMLS';
   source_metadata?: string;
+  // Hybrid storage fields (for large code sets >= 500 concepts)
+  build_type?: 'hierarchical' | 'direct' | 'labtest';
+  anchor_concept_ids?: number[];
+  build_parameters?: {
+    combo_filter?: 'ALL' | 'SINGLE' | 'COMBINATION';
+    domain_id?: string;
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -88,8 +96,12 @@ async function handleSaveCodeSet(
     code_set_name,
     description,
     concepts,
+    total_concepts: providedTotalConcepts,
     source_type,
     source_metadata,
+    build_type,
+    anchor_concept_ids,
+    build_parameters,
   } = req.body as SaveCodeSetRequest;
 
   // Verify user can only save to their own account
@@ -109,22 +121,58 @@ async function handleSaveCodeSet(
     const pool = await sql.connect(process.env.AZURE_SQL_CONNECTION_STRING || '');
     const request = pool.request();
 
-    const conceptsJson = JSON.stringify(concepts);
-    const totalConcepts = concepts.length;
+    // Use provided total_concepts if available (for large code sets), otherwise use concepts.length
+    const totalConcepts = providedTotalConcepts || concepts.length;
+    const LARGE_CODESET_THRESHOLD = 500;
 
-    console.log(`💾 Saving ${source_type} code set:`, {
-      name: code_set_name,
-      conceptsCount: totalConcepts,
-      conceptsJsonLength: conceptsJson.length,
-      firstConcept: concepts[0],
-      lastConcept: concepts[concepts.length - 1]
-    });
+    // Hybrid approach: Large code sets (>=500 concepts) save anchors only
+    const isLargeCodeSet = totalConcepts >= LARGE_CODESET_THRESHOLD;
+    const isMaterialized = !isLargeCodeSet;
+
+    let conceptsJson: string;
+    let anchorConceptsJson: string | null = null;
+    let buildParamsJson: string | null = null;
+
+    if (isLargeCodeSet) {
+      // Large code set: Save anchor concepts and build parameters for rebuild
+      console.log(`💾 Saving LARGE ${source_type} code set (anchor-only):`, {
+        name: code_set_name,
+        totalConcepts,
+        anchorConceptIds: anchor_concept_ids,
+        buildType: build_type,
+        buildParameters: build_parameters
+      });
+
+      if (!anchor_concept_ids || anchor_concept_ids.length === 0) {
+        return res.status(400).json(createErrorResponse('anchor_concept_ids required for large code sets', 400));
+      }
+      if (!build_type) {
+        return res.status(400).json(createErrorResponse('build_type required for large code sets', 400));
+      }
+
+      // For large code sets, save anchor concepts (frontend already filtered to anchors only)
+      conceptsJson = JSON.stringify(concepts);
+      anchorConceptsJson = JSON.stringify(anchor_concept_ids);
+      buildParamsJson = JSON.stringify(build_parameters || {});
+    } else {
+      // Small code set: Save full concepts as before
+      conceptsJson = JSON.stringify(concepts);
+      console.log(`💾 Saving SMALL ${source_type} code set (materialized):`, {
+        name: code_set_name,
+        conceptsCount: totalConcepts,
+        conceptsJsonLength: conceptsJson.length,
+        firstConcept: concepts[0],
+        lastConcept: concepts[concepts.length - 1]
+      });
+    }
 
     const query = `
       INSERT INTO saved_code_sets
-        (supabase_user_id, code_set_name, description, concepts, total_concepts, source_type, source_metadata)
+        (supabase_user_id, code_set_name, description, concepts, total_concepts, source_type, source_metadata,
+         build_type, anchor_concepts, build_parameters, is_materialized)
       VALUES
-        (@supabase_user_id, @code_set_name, @description, @concepts, @total_concepts, @source_type, @source_metadata);
+        (@supabase_user_id, @code_set_name, @description, @concepts, @total_concepts, @source_type, @source_metadata,
+         @build_type, @anchor_concepts, @build_parameters, @is_materialized);
 
       SELECT SCOPE_IDENTITY() AS id;
     `;
@@ -136,11 +184,16 @@ async function handleSaveCodeSet(
     request.input('total_concepts', sql.Int, totalConcepts);
     request.input('source_type', sql.VarChar(10), source_type);
     request.input('source_metadata', sql.NVarChar(sql.MAX), source_metadata || null);
+    request.input('build_type', sql.VarChar(20), build_type || null);
+    request.input('anchor_concepts', sql.NVarChar(sql.MAX), anchorConceptsJson);
+    request.input('build_parameters', sql.NVarChar(sql.MAX), buildParamsJson);
+    request.input('is_materialized', sql.Bit, isMaterialized);
 
     const result = await request.query(query);
     const id = result.recordset[0].id;
 
-    console.log(`✅ ${source_type} code set saved:`, id, `with ${totalConcepts} concepts`);
+    console.log(`✅ ${source_type} code set saved:`, id, `with ${totalConcepts} concepts`,
+                isLargeCodeSet ? '(anchor-only, needs rebuild on load)' : '(fully materialized)');
     return res.status(200).json(createSuccessResponse({ id }));
   } catch (error) {
     console.error('Failed to save code set:', error);
@@ -173,6 +226,7 @@ async function handleGetCodeSets(
         total_concepts,
         source_type,
         source_metadata,
+        is_materialized,
         created_at,
         updated_at
       FROM saved_code_sets
@@ -222,6 +276,10 @@ async function handleGetCodeSetDetail(
         total_concepts,
         source_type,
         source_metadata,
+        build_type,
+        anchor_concepts,
+        build_parameters,
+        is_materialized,
         created_at,
         updated_at
       FROM saved_code_sets
@@ -249,18 +307,28 @@ async function handleGetCodeSetDetail(
       name: codeSet.code_set_name,
       source_type: codeSet.source_type,
       total_concepts: codeSet.total_concepts,
+      is_materialized: codeSet.is_materialized,
+      build_type: codeSet.build_type,
       conceptsFieldLength: codeSet.concepts?.length || 0,
       conceptsPreview: codeSet.concepts?.substring(0, 200)
     });
 
-    // Parse concepts JSON
-    const parsedConcepts = JSON.parse(codeSet.concepts);
+    // Parse JSON fields
+    const parsedConcepts = codeSet.concepts ? JSON.parse(codeSet.concepts) : [];
+    const parsedAnchorConcepts = codeSet.anchor_concepts ? JSON.parse(codeSet.anchor_concepts) : null;
+    const parsedBuildParams = codeSet.build_parameters ? JSON.parse(codeSet.build_parameters) : null;
+
     const response = {
       ...codeSet,
       concepts: parsedConcepts,
+      anchor_concept_ids: parsedAnchorConcepts,
+      build_parameters: parsedBuildParams,
     };
 
-    console.log('✅ Retrieved code set detail:', codeSetId, '- parsed concepts count:', parsedConcepts.length, 'DB total_concepts:', codeSet.total_concepts);
+    console.log('✅ Retrieved code set detail:', codeSetId,
+                '- parsed concepts count:', parsedConcepts.length,
+                'DB total_concepts:', codeSet.total_concepts,
+                'is_materialized:', codeSet.is_materialized);
     return res.status(200).json(createSuccessResponse(response));
   } catch (error) {
     console.error('Failed to get code set detail:', error);

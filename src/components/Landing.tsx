@@ -30,7 +30,7 @@ export default function Landing({ onSelectWorkflow, connectionStatus, errorMessa
                 <span className="text-sm font-medium text-blue-900">Connecting to database...</span>
               </div>
               <p className="text-xs text-center text-blue-700">
-                Initial connection may take up to 2 minutes if the database is starting from a cold state.
+                Initial connection may take up to 5 minutes if the database is starting from a cold state.
               </p>
             </div>
           )}

@@ -246,7 +246,7 @@ export default function SavedCodeSets() {
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-gray-900">{codeSet.code_set_name}</h3>
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full ${
@@ -257,12 +257,20 @@ export default function SavedCodeSets() {
                       >
                         {codeSet.source_type}
                       </span>
+                      {codeSet.is_materialized === false && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200"
+                          title="Large code set saved with anchor-only storage. Click Edit to rebuild all concepts."
+                        >
+                          Anchor-Only
+                        </span>
+                      )}
                     </div>
                     {codeSet.description && (
                       <p className="text-sm text-gray-600 mt-1">{codeSet.description}</p>
                     )}
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                      <span>{codeSet.total_concepts} concepts</span>
+                      <span>{codeSet.total_concepts?.toLocaleString()} concepts</span>
                       <span>•</span>
                       <span>{new Date(codeSet.created_at).toLocaleDateString()}</span>
                     </div>
@@ -327,16 +335,49 @@ export default function SavedCodeSets() {
                   {selectedCodeSet.description && (
                     <p className="text-sm text-gray-600 mt-1">{selectedCodeSet.description}</p>
                   )}
+
+                  {/* Large code set info banner */}
+                  {selectedCodeSet.is_materialized === false && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1 text-xs">
+                          <p className="font-semibold text-blue-900 mb-1">Large Code Set (Anchor-Only Storage)</p>
+                          <p className="text-blue-700">
+                            This code set contains {selectedCodeSet.total_concepts?.toLocaleString() || 'many'} total concepts.
+                            Only the {selectedCodeSet.concepts.length} anchor concept{selectedCodeSet.concepts.length !== 1 ? 's' : ''} shown below {selectedCodeSet.concepts.length !== 1 ? 'are' : 'is'} stored.
+                          </p>
+                          <p className="text-blue-700 mt-1.5 font-medium">
+                            → Click <Edit className="w-3 h-3 inline mx-0.5" /> Edit to rebuild the full code set and export all concepts.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between mt-3">
                     <span className="text-sm text-gray-500">
-                      {selectedCodeSet.concepts.length} concepts
+                      {selectedCodeSet.is_materialized === false
+                        ? `${selectedCodeSet.concepts.length} anchor concept${selectedCodeSet.concepts.length !== 1 ? 's' : ''} (${selectedCodeSet.total_concepts?.toLocaleString()} total)`
+                        : `${selectedCodeSet.concepts.length} concepts`
+                      }
                     </span>
                     <button
                       onClick={() => handleExportTxt(selectedCodeSet)}
                       className="btn-secondary text-sm flex items-center gap-2"
+                      title={
+                        selectedCodeSet.is_materialized === false
+                          ? 'This will export only the anchor concepts. Click Edit to rebuild and export all concepts.'
+                          : 'Export all concepts to TXT file'
+                      }
                     >
                       <Download className="w-4 h-4" />
                       Export TXT
+                      {selectedCodeSet.is_materialized === false && (
+                        <span className="text-xs text-orange-600">(Anchors Only)</span>
+                      )}
                     </button>
                   </div>
                 </div>

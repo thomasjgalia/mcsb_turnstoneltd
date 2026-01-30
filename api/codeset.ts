@@ -28,6 +28,11 @@ interface CodeSetResult {
   dfg_name?: string;
   concept_attribute?: string;
   value?: string;
+  relationships_json?: string | null;
+  relationships?: Array<{
+    relationship_id: string;
+    value_name: string;
+  }>;
 }
 
 /**
@@ -97,7 +102,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           NULL                                AS dose_form,
           NULL                                AS dfg_name,
           NULL                                AS concept_attribute,
-          NULL                                AS value
+          NULL                                AS value,
+          JSON_QUERY((
+            SELECT
+              CR2.RELATIONSHIP_ID as relationship_id,
+              S2.CONCEPT_NAME as value_name
+            FROM CONCEPT_RELATIONSHIP CR2
+            INNER JOIN CONCEPT S2 ON S2.CONCEPT_ID = CR2.CONCEPT_ID_2
+            WHERE CR2.concept_id_1 = C.concept_id
+              AND CR2.RELATIONSHIP_ID IN (
+                'RxNorm has dose form',
+                'Has property',
+                'Has scale type',
+                'Has system',
+                'Has time aspect',
+                'Has asso morph',
+                'Has finding site',
+                'Has component'
+              )
+            ORDER BY CR2.RELATIONSHIP_ID
+            FOR JSON PATH
+          )) AS relationships_json
         FROM CONCEPT C
         WHERE C.CONCEPT_ID IN (${placeholders})
         ORDER BY C.VOCABULARY_ID, C.CONCEPT_CODE
@@ -105,7 +130,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       console.log(`📊 Lab Test Build: Executing single query with IN clause for ${concept_ids.length} IDs`);
       const results = await executeQuery<CodeSetResult>(labtestSQL, parameters);
-      allResults.push(...results);
+
+      // Parse relationships_json into actual objects
+      const parsedResults = results.map(r => ({
+        ...r,
+        relationships: r.relationships_json ? JSON.parse(r.relationships_json) : []
+      }));
+
+      allResults.push(...parsedResults);
 
       const duration = Date.now() - startTime;
       console.log(`✅ Lab Test Build: Completed in ${duration}ms - returned ${results.length} results`);

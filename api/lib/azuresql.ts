@@ -25,8 +25,8 @@ async function getPool(): Promise<sql.ConnectionPool> {
     options: {
       encrypt: true, // Required for Azure
       trustServerCertificate: true, // Required for Azure SQL with mssql library
-      connectTimeout: 90000, // 90 seconds to allow for Azure SQL auto-resume from pause
-      requestTimeout: 90000, // 90 seconds for query execution
+      connectTimeout: 300000, // 5 minutes to allow for Azure SQL auto-resume from pause
+      requestTimeout: 300000, // 5 minutes for query execution
     },
     pool: {
       max: 10,
