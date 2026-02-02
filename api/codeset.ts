@@ -7,6 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   executeQuery,
+  executeStoredProcedure,
   createErrorResponse,
 } from './lib/azuresql.js';
 
@@ -200,8 +201,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Handle Hierarchical Build (existing logic)
-    for (const conceptId of concept_ids) {
+    // Handle Hierarchical Build - Dual Path Implementation
+    const useStoredProcs = process.env.USE_STORED_PROCEDURES === 'true';
+    const startTime = Date.now();
+
+    if (useStoredProcs) {
+      // NEW PATH: Use stored procedure (2 queries instead of 2*N)
+      console.log(`🚀 Hierarchical Build: Using stored procedure for ${concept_ids.length} concepts`);
+
+      try {
+        const tvpRows = concept_ids.map(id => [id]);
+        const results = await executeStoredProcedure<CodeSetResult>(
+          'dbo.sp_BuildCodeSet_Hierarchical',
+          { ComboFilter: combo_filter },
+          {
+            name: 'ConceptIds',
+            typeName: 'dbo.ConceptIdList',
+            rows: tvpRows
+          }
+        );
+
+        allResults.push(...results);
+        const duration = Date.now() - startTime;
+        console.log(`✅ Stored procedure completed in ${duration}ms - returned ${results.length} results`);
+      } catch (error) {
+        console.error('❌ Stored procedure failed, falling back to dynamic queries:', error);
+        // Fall through to old path below
+      }
+    }
+
+    // OLD PATH: Dynamic queries (fallback if stored proc fails or feature flag is off)
+    if (!useStoredProcs || allResults.length === 0) {
+      console.log(`🔄 Hierarchical Build: Using dynamic queries for ${concept_ids.length} concepts`);
+
+      for (const conceptId of concept_ids) {
       // Get domain for this concept
       const domainSQL = `SELECT domain_id FROM concept WHERE concept_id = @concept_id`;
       const domainResult = await executeQuery<{ domain_id: string }>(domainSQL, {
@@ -334,6 +367,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         combo: combo_filter,
       });
       allResults.push(...results);
+    }
+
+      const duration = Date.now() - startTime;
+      console.log(`✅ Dynamic queries completed in ${duration}ms - returned ${allResults.length} results`);
     }
 
     // Deduplicate results based on vocabulary, code, name, concept_id, and class

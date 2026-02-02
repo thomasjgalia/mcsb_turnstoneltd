@@ -7,6 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   executeQuery,
+  executeStoredProcedure,
   createErrorResponse,
 } from './lib/azuresql.js';
 
@@ -46,7 +47,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // First, get the domain_id for the concept
+    // Dual-Path Implementation: Try stored procedure first
+    const useStoredProcs = process.env.USE_STORED_PROCEDURES === 'true';
+
+    if (useStoredProcs) {
+      console.log('🚀 Hierarchy: Using stored procedure');
+      try {
+        const results = await executeStoredProcedure<HierarchyResult>(
+          'dbo.sp_GetConceptHierarchy',
+          { ConceptId: concept_id }
+        );
+
+        return res.status(200).json({
+          success: true,
+          data: results,
+        });
+      } catch (error) {
+        console.error('❌ Stored procedure failed, falling back to dynamic queries:', error);
+        // Fall through to old path
+      }
+    }
+
+    // OLD PATH: Two-query pattern (domain lookup + hierarchy query)
+    console.log('🔄 Hierarchy: Using dynamic queries');
     const domainSQL = `
       SELECT domain_id FROM concept WHERE concept_id = @concept_id
     `;

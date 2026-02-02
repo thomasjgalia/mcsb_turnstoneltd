@@ -94,6 +94,63 @@ export async function executeQuery<T>(
 }
 
 /**
+ * Execute stored procedure with optional table-valued parameters
+ */
+export async function executeStoredProcedure<T>(
+  procedureName: string,
+  params?: Record<string, any>,
+  tvpParams?: { name: string; typeName: string; rows: any[][] }
+): Promise<T[]> {
+  try {
+    console.log(`📊 Executing stored procedure: ${procedureName}`);
+
+    const pool = await getPool();
+    const request = pool.request();
+
+    // Add regular parameters
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (typeof value === 'number') {
+          request.input(key, sql.Int, value);
+        } else if (typeof value === 'string') {
+          request.input(key, sql.NVarChar, value);
+        } else {
+          request.input(key, value);
+        }
+      }
+    }
+
+    // Add table-valued parameter if provided
+    if (tvpParams) {
+      const table = new sql.Table(tvpParams.typeName);
+
+      // Define columns based on type
+      if (tvpParams.typeName === 'dbo.ConceptIdList') {
+        table.columns.add('concept_id', sql.Int);
+      }
+
+      // Add rows
+      for (const row of tvpParams.rows) {
+        table.rows.add(...row);
+      }
+
+      request.input(tvpParams.name, table);
+    }
+
+    const result = await request.execute(procedureName);
+    console.log(`✅ Stored procedure returned ${result.recordset.length} rows`);
+
+    return result.recordset as T[];
+  } catch (error) {
+    console.error('❌ Stored procedure execution error:', error);
+    console.error('Procedure:', procedureName);
+    console.error('Params:', params);
+    const message = error instanceof Error ? error.message : 'Stored procedure execution failed';
+    throw new Error(`Stored procedure failed: ${message}`);
+  }
+}
+
+/**
  * Build vocabulary filter SQL for different domains
  * Converts Oracle's sys.odcivarchar2list to SQL Server IN clause
  */
