@@ -39,19 +39,32 @@ export default function Step3CodeSet({
   const [comboFilter, setComboFilter] = useState<ComboFilter>('ALL');
   const [sqlCopied, setSqlCopied] = useState(false);
   const [hasBuilt, setHasBuilt] = useState(false);
-  const [selectedVocabularies, setSelectedVocabularies] = useState<Set<string>>(new Set());
   const [excludedCodes, setExcludedCodes] = useState<Set<string>>(new Set());
   const [collapsedVocabs, setCollapsedVocabs] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const [selectedAttribute, setSelectedAttribute] = useState<string>('');
-  const [selectedValue, setSelectedValue] = useState<string>('');
-  // Drug-specific filters (multi-select)
+  const [isFiltering, setIsFiltering] = useState(false);
+
+  // Pending filter states (user selections, not yet applied)
+  const [pendingVocabularies, setPendingVocabularies] = useState<Set<string>>(new Set());
+  const [pendingCombos, setPendingCombos] = useState<Set<string>>(new Set());
+  const [pendingDoseForms, setPendingDoseForms] = useState<Set<string>>(new Set());
+  const [pendingDfgCategories, setPendingDfgCategories] = useState<Set<string>>(new Set());
+  const [pendingAttribute, setPendingAttribute] = useState<string>('');
+  const [pendingValue, setPendingValue] = useState<string>('');
+
+  // Active filter states (actually applied to results)
+  const [selectedVocabularies, setSelectedVocabularies] = useState<Set<string>>(new Set());
   const [selectedCombos, setSelectedCombos] = useState<Set<string>>(new Set());
   const [selectedDoseForms, setSelectedDoseForms] = useState<Set<string>>(new Set());
   const [selectedDfgCategories, setSelectedDfgCategories] = useState<Set<string>>(new Set());
-  const [isFiltering, setIsFiltering] = useState(false);
+  const [selectedAttribute, setSelectedAttribute] = useState<string>('');
+  const [selectedValue, setSelectedValue] = useState<string>('');
+
+  // Per-vocabulary display limits
+  const [vocabDisplayLimits, setVocabDisplayLimits] = useState<Map<string, number>>(new Map());
+  const DEFAULT_DISPLAY_LIMIT = 100;
   // Initialize build type from workflow prop (direct workflow = direct build, hierarchical workflow = hierarchical build, labtest workflow = labtest build)
   const [buildType, setBuildType] = useState<'hierarchical' | 'direct' | 'labtest'>(
     workflow === 'direct' ? 'direct' : workflow === 'labtest' ? 'labtest' : 'hierarchical'
@@ -209,16 +222,16 @@ export default function Step3CodeSet({
   );
 
   const availableValues = useMemo(() =>
-    selectedAttribute
+    pendingAttribute
       ? Array.from(
           new Set(
             results
-              .filter((r) => r.concept_attribute === selectedAttribute && r.value)
+              .filter((r) => r.concept_attribute === pendingAttribute && r.value)
               .map((r) => r.value as string)
           )
         ).sort()
       : [],
-    [results, selectedAttribute]
+    [results, pendingAttribute]
   );
 
   const availableCombos = useMemo(() =>
@@ -236,19 +249,71 @@ export default function Step3CodeSet({
     [results]
   );
 
-  // Reset selected value when attribute changes
-  useEffect(() => {
-    setSelectedValue('');
-  }, [selectedAttribute]);
-
-  // Show filtering indicator when filters change
-  useEffect(() => {
-    if (results.length > 500) {
-      setIsFiltering(true);
-      const timer = setTimeout(() => setIsFiltering(false), 1500);
-      return () => clearTimeout(timer);
+  // Helper function to compare two sets
+  const setsEqual = (a: Set<string>, b: Set<string>) => {
+    if (a.size !== b.size) return false;
+    for (const item of a) {
+      if (!b.has(item)) return false;
     }
-  }, [selectedVocabularies, selectedAttribute, selectedValue, selectedCombos, selectedDoseForms, selectedDfgCategories, results.length]);
+    return true;
+  };
+
+  // Check if there are pending filter changes
+  const hasPendingChanges = useMemo(() => {
+    return (
+      !setsEqual(pendingVocabularies, selectedVocabularies) ||
+      !setsEqual(pendingCombos, selectedCombos) ||
+      !setsEqual(pendingDoseForms, selectedDoseForms) ||
+      !setsEqual(pendingDfgCategories, selectedDfgCategories) ||
+      pendingAttribute !== selectedAttribute ||
+      pendingValue !== selectedValue
+    );
+  }, [
+    pendingVocabularies, selectedVocabularies,
+    pendingCombos, selectedCombos,
+    pendingDoseForms, selectedDoseForms,
+    pendingDfgCategories, selectedDfgCategories,
+    pendingAttribute, selectedAttribute,
+    pendingValue, selectedValue,
+  ]);
+
+  // Apply pending filters to active filters
+  const applyFilters = () => {
+    setIsFiltering(true);
+
+    // Copy pending to active
+    setSelectedVocabularies(new Set(pendingVocabularies));
+    setSelectedCombos(new Set(pendingCombos));
+    setSelectedDoseForms(new Set(pendingDoseForms));
+    setSelectedDfgCategories(new Set(pendingDfgCategories));
+    setSelectedAttribute(pendingAttribute);
+    setSelectedValue(pendingValue);
+
+    // Hide filtering indicator after a delay
+    setTimeout(() => setIsFiltering(false), 800);
+  };
+
+  // Clear all filters (both pending and active)
+  const clearAllFilters = () => {
+    setPendingVocabularies(new Set());
+    setPendingCombos(new Set());
+    setPendingDoseForms(new Set());
+    setPendingDfgCategories(new Set());
+    setPendingAttribute('');
+    setPendingValue('');
+
+    setSelectedVocabularies(new Set());
+    setSelectedCombos(new Set());
+    setSelectedDoseForms(new Set());
+    setSelectedDfgCategories(new Set());
+    setSelectedAttribute('');
+    setSelectedValue('');
+  };
+
+  // Reset pending value when pending attribute changes
+  useEffect(() => {
+    setPendingValue('');
+  }, [pendingAttribute]);
 
   // Optimized filtering: combine all filters into single pass (memoized)
   const visibleResults = useMemo(() => {
@@ -340,63 +405,74 @@ export default function Step3CodeSet({
     }, {} as Record<string, CodeSetResult[]>);
   }, [visibleResults]);
 
-  // Toggle vocabulary filter
+  // Toggle vocabulary filter (pending state)
   const toggleVocabulary = (vocab: string) => {
-    const newSelected = new Set(selectedVocabularies);
+    const newSelected = new Set(pendingVocabularies);
     if (newSelected.has(vocab)) {
       newSelected.delete(vocab);
     } else {
       newSelected.add(vocab);
     }
-    setSelectedVocabularies(newSelected);
+    setPendingVocabularies(newSelected);
   };
 
-  // Select all vocabularies
+  // Select all vocabularies (pending state)
   const selectAllVocabularies = () => {
-    setSelectedVocabularies(new Set(availableVocabularies));
+    setPendingVocabularies(new Set(availableVocabularies));
   };
 
-  // Clear all vocabulary selections
+  // Clear all vocabulary selections (pending state)
   const clearAllVocabularies = () => {
-    setSelectedVocabularies(new Set());
+    setPendingVocabularies(new Set());
   };
 
-  // Clear all drug filters
-  const clearAllDrugFilters = () => {
-    setSelectedCombos(new Set());
-    setSelectedDoseForms(new Set());
-    setSelectedDfgCategories(new Set());
-  };
-
-  // Toggle drug filter selections
+  // Toggle drug filter selections (pending state)
   const toggleCombo = (combo: string) => {
-    const newSelected = new Set(selectedCombos);
+    const newSelected = new Set(pendingCombos);
     if (newSelected.has(combo)) {
       newSelected.delete(combo);
     } else {
       newSelected.add(combo);
     }
-    setSelectedCombos(newSelected);
+    setPendingCombos(newSelected);
   };
 
   const toggleDoseForm = (doseForm: string) => {
-    const newSelected = new Set(selectedDoseForms);
+    const newSelected = new Set(pendingDoseForms);
     if (newSelected.has(doseForm)) {
       newSelected.delete(doseForm);
     } else {
       newSelected.add(doseForm);
     }
-    setSelectedDoseForms(newSelected);
+    setPendingDoseForms(newSelected);
   };
 
   const toggleDfgCategory = (dfgCategory: string) => {
-    const newSelected = new Set(selectedDfgCategories);
+    const newSelected = new Set(pendingDfgCategories);
     if (newSelected.has(dfgCategory)) {
       newSelected.delete(dfgCategory);
     } else {
       newSelected.add(dfgCategory);
     }
-    setSelectedDfgCategories(newSelected);
+    setPendingDfgCategories(newSelected);
+  };
+
+  // Display limit functions for per-vocabulary pagination
+  const getVocabDisplayLimit = (vocab: string) => {
+    return vocabDisplayLimits.get(vocab) || DEFAULT_DISPLAY_LIMIT;
+  };
+
+  const showMoreForVocab = (vocab: string) => {
+    const currentLimit = getVocabDisplayLimit(vocab);
+    const newLimits = new Map(vocabDisplayLimits);
+    newLimits.set(vocab, currentLimit + 100);
+    setVocabDisplayLimits(newLimits);
+  };
+
+  const showAllForVocab = (vocab: string) => {
+    const newLimits = new Map(vocabDisplayLimits);
+    newLimits.set(vocab, Infinity);
+    setVocabDisplayLimits(newLimits);
   };
 
   // Toggle individual code exclusion
@@ -627,7 +703,7 @@ export default function Step3CodeSet({
                     <div className="flex flex-wrap gap-1.5">
                       {availableVocabularies.map((vocab) => {
                         const count = vocabularyCounts.get(vocab) || 0;
-                        const isSelected = selectedVocabularies.has(vocab);
+                        const isSelected = pendingVocabularies.has(vocab);
                         return (
                           <button
                             key={vocab}
@@ -663,7 +739,7 @@ export default function Step3CodeSet({
                         }}
                       >
                         <span className="truncate">
-                          {selectedCombos.size === 0 ? 'All' : `${selectedCombos.size} selected`}
+                          {pendingCombos.size === 0 ? 'All' : `${pendingCombos.size} selected`}
                         </span>
                         <ChevronDown className="w-3 h-3 ml-1 flex-shrink-0" />
                       </button>
@@ -673,7 +749,7 @@ export default function Step3CodeSet({
                       >
                         {availableCombos.map((combo) => {
                           const count = comboCounts.get(combo) || 0;
-                          const isSelected = selectedCombos.has(combo);
+                          const isSelected = pendingCombos.has(combo);
                           return (
                             <label
                               key={combo}
@@ -708,7 +784,7 @@ export default function Step3CodeSet({
                         }}
                       >
                         <span className="truncate">
-                          {selectedDoseForms.size === 0 ? 'All' : `${selectedDoseForms.size} selected`}
+                          {pendingDoseForms.size === 0 ? 'All' : `${pendingDoseForms.size} selected`}
                         </span>
                         <ChevronDown className="w-3 h-3 ml-1 flex-shrink-0" />
                       </button>
@@ -718,7 +794,7 @@ export default function Step3CodeSet({
                       >
                         {availableDoseForms.map((doseForm) => {
                           const count = doseFormCounts.get(doseForm) || 0;
-                          const isSelected = selectedDoseForms.has(doseForm);
+                          const isSelected = pendingDoseForms.has(doseForm);
                           return (
                             <label
                               key={doseForm}
@@ -753,7 +829,7 @@ export default function Step3CodeSet({
                         }}
                       >
                         <span className="truncate">
-                          {selectedDfgCategories.size === 0 ? 'All' : `${selectedDfgCategories.size} selected`}
+                          {pendingDfgCategories.size === 0 ? 'All' : `${pendingDfgCategories.size} selected`}
                         </span>
                         <ChevronDown className="w-3 h-3 ml-1 flex-shrink-0" />
                       </button>
@@ -763,7 +839,7 @@ export default function Step3CodeSet({
                       >
                         {availableDfgCategories.map((dfg) => {
                           const count = dfgCategoryCounts.get(dfg) || 0;
-                          const isSelected = selectedDfgCategories.has(dfg);
+                          const isSelected = pendingDfgCategories.has(dfg);
                           return (
                             <label
                               key={dfg}
@@ -793,8 +869,8 @@ export default function Step3CodeSet({
                     <div className="flex gap-2">
                       <select
                         id="attributeFilter"
-                        value={selectedAttribute}
-                        onChange={(e) => setSelectedAttribute(e.target.value)}
+                        value={pendingAttribute}
+                        onChange={(e) => setPendingAttribute(e.target.value)}
                         className="select-field text-xs flex-1"
                       >
                         <option value="">All attributes</option>
@@ -806,10 +882,10 @@ export default function Step3CodeSet({
                       </select>
                       <select
                         id="valueFilter"
-                        value={selectedValue}
-                        onChange={(e) => setSelectedValue(e.target.value)}
+                        value={pendingValue}
+                        onChange={(e) => setPendingValue(e.target.value)}
                         className="select-field text-xs flex-1"
-                        disabled={!selectedAttribute || availableValues.length === 0}
+                        disabled={!pendingAttribute || availableValues.length === 0}
                       >
                         <option value="">All values</option>
                         {availableValues.map((val) => (
@@ -818,11 +894,11 @@ export default function Step3CodeSet({
                           </option>
                         ))}
                       </select>
-                      {(selectedAttribute || selectedValue) && (
+                      {(pendingAttribute || pendingValue) && (
                         <button
                           onClick={() => {
-                            setSelectedAttribute('');
-                            setSelectedValue('');
+                            setPendingAttribute('');
+                            setPendingValue('');
                           }}
                           className="btn-secondary text-xs px-2 py-1.5 whitespace-nowrap"
                         >
@@ -834,7 +910,34 @@ export default function Step3CodeSet({
                 )}
               </div>
 
-              <div className="mt-3 flex items-center justify-between">
+              {/* Apply Filters Button & Status */}
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={applyFilters}
+                    disabled={!hasPendingChanges}
+                    className={`
+                      btn-primary flex items-center gap-1.5 text-sm px-4 py-2
+                      ${!hasPendingChanges ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                  >
+                    <PackageCheck className="w-4 h-4" />
+                    Apply Filters
+                    {hasPendingChanges && (
+                      <span className="ml-1 bg-white text-primary-600 rounded-full px-2 py-0.5 text-xs font-semibold">
+                        Pending
+                      </span>
+                    )}
+                  </button>
+                  {(pendingVocabularies.size > 0 || pendingCombos.size > 0 || pendingDoseForms.size > 0 || pendingDfgCategories.size > 0 || pendingAttribute) && (
+                    <button
+                      onClick={clearAllFilters}
+                      className="text-xs text-gray-600 hover:text-gray-800 font-medium"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">
                   {selectedAttribute && selectedValue
                     ? `Filtered to ${visibleResults.length} codes with ${selectedAttribute} = ${selectedValue}`
@@ -842,14 +945,6 @@ export default function Step3CodeSet({
                     ? `Showing all ${visibleResults.length} codes`
                     : `Showing ${visibleResults.length} of ${results.length} codes`}
                 </p>
-                {(selectedCombos.size > 0 || selectedDoseForms.size > 0 || selectedDfgCategories.size > 0) && (
-                  <button
-                    onClick={clearAllDrugFilters}
-                    className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                  >
-                    Clear Drug Filters
-                  </button>
-                )}
               </div>
             </div>
           )}
@@ -918,6 +1013,10 @@ export default function Step3CodeSet({
             const isCollapsed = collapsedVocabs.has(vocabulary);
             const includedCount = vocabResults.filter((r) => !isCodeExcluded(vocabulary, r.child_code)).length;
             const excludedCount = vocabResults.length - includedCount;
+            const displayLimit = getVocabDisplayLimit(vocabulary);
+            const displayedResults = vocabResults.slice(0, displayLimit);
+            const hasMore = vocabResults.length > displayLimit;
+            const remainingCount = vocabResults.length - displayLimit;
 
             return (
               <div key={vocabulary} className="card p-3">
@@ -933,7 +1032,7 @@ export default function Step3CodeSet({
                     )}
                     <span className="badge badge-primary text-xs px-2 py-0.5">{vocabulary}</span>
                     <span className="text-xs font-normal text-gray-500">
-                      ({vocabResults.length} codes)
+                      ({vocabResults.length} codes{hasMore ? `, showing ${displayedResults.length}` : ''})
                     </span>
                   </h3>
                   {excludedCount > 0 && (
@@ -944,74 +1043,101 @@ export default function Step3CodeSet({
                 </div>
 
                 {!isCollapsed && (
-                  <div className="table-container">
-                <table className="table compact-table">
-                  <thead>
-                    <tr>
-                      <th className="w-12 text-xs py-1.5"></th>
-                      <th className="text-xs py-1.5">Code</th>
-                      <th className="text-xs py-1.5">Name</th>
-                      <th className="text-xs py-1.5">Concept ID</th>
-                      <th className="text-xs py-1.5">Class</th>
-                      {vocabResults[0]?.combinationyesno && <th className="text-xs py-1.5">Combo</th>}
-                      {vocabResults[0]?.dose_form && <th className="text-xs py-1.5">Dose Form</th>}
-                      {vocabResults[0]?.dfg_name && <th className="text-xs py-1.5">DFG Category</th>}
-                      {vocabResults.some((r) => r.value) && <th className="text-xs py-1.5">Attribute</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {vocabResults.map((result, index) => {
-                      const isExcluded = isCodeExcluded(vocabulary, result.child_code);
-                      return (
-                        <tr
-                          key={`${result.child_concept_id}-${index}`}
-                          className={isExcluded ? 'bg-gray-50 opacity-60' : ''}
+                  <>
+                    <div className="table-container">
+                      <table className="table compact-table">
+                        <thead>
+                          <tr>
+                            <th className="w-12 text-xs py-1.5"></th>
+                            <th className="text-xs py-1.5">Code</th>
+                            <th className="text-xs py-1.5">Name</th>
+                            <th className="text-xs py-1.5">Concept ID</th>
+                            <th className="text-xs py-1.5">Class</th>
+                            {vocabResults[0]?.combinationyesno && <th className="text-xs py-1.5">Combo</th>}
+                            {vocabResults[0]?.dose_form && <th className="text-xs py-1.5">Dose Form</th>}
+                            {vocabResults[0]?.dfg_name && <th className="text-xs py-1.5">DFG Category</th>}
+                            {vocabResults.some((r) => r.value) && <th className="text-xs py-1.5">Attribute</th>}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {displayedResults.map((result, index) => {
+                            const isExcluded = isCodeExcluded(vocabulary, result.child_code);
+                            return (
+                              <tr
+                                key={`${result.child_concept_id}-${index}`}
+                                className={isExcluded ? 'bg-gray-50 opacity-60' : ''}
+                              >
+                                <td className="py-1.5 px-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={!isExcluded}
+                                    onChange={() => toggleCodeExclusion(vocabulary, result.child_code)}
+                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    title={isExcluded ? "Include in export" : "Exclude from export"}
+                                  />
+                                </td>
+                                <td className="font-mono text-xs py-1.5 px-2">{result.child_code}</td>
+                                <td className="font-medium text-sm py-1.5 px-2">{result.child_name}</td>
+                                <td className="text-xs py-1.5 px-2">{result.child_concept_id}</td>
+                                <td className="text-xs text-gray-600 py-1.5 px-2">{result.concept_class_id}</td>
+                              {result.combinationyesno && (
+                                <td className="py-1.5 px-2">
+                                  <span
+                                    className={`badge text-xs px-1.5 py-0.5 ${
+                                      result.combinationyesno === 'COMBINATION'
+                                        ? 'badge-warning'
+                                        : 'badge-success'
+                                    }`}
+                                  >
+                                    {result.combinationyesno}
+                                  </span>
+                                </td>
+                              )}
+                              {result.dose_form && (
+                                <td className="text-xs text-gray-600 py-1.5 px-2">{result.dose_form}</td>
+                              )}
+                              {result.dfg_name && (
+                                <td className="py-1.5 px-2">
+                                  <span className="badge badge-info text-xs px-1.5 py-0.5">
+                                    {result.dfg_name}
+                                  </span>
+                                </td>
+                              )}
+                              {vocabResults.some((r) => r.value) && (
+                                <td className="text-xs text-gray-600 py-1.5 px-2">{result.value || '-'}</td>
+                              )}
+                            </tr>
+                          );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Show More / Show All buttons */}
+                    {hasMore && (
+                      <div className="mt-3 flex items-center justify-center gap-2 pt-2 border-t border-gray-200">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showMoreForVocab(vocabulary);
+                          }}
+                          className="btn-secondary flex items-center gap-1.5 text-xs px-3 py-1.5"
                         >
-                          <td className="py-1.5 px-2">
-                            <input
-                              type="checkbox"
-                              checked={!isExcluded}
-                              onChange={() => toggleCodeExclusion(vocabulary, result.child_code)}
-                              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                              title={isExcluded ? "Include in export" : "Exclude from export"}
-                            />
-                          </td>
-                          <td className="font-mono text-xs py-1.5 px-2">{result.child_code}</td>
-                          <td className="font-medium text-sm py-1.5 px-2">{result.child_name}</td>
-                          <td className="text-xs py-1.5 px-2">{result.child_concept_id}</td>
-                          <td className="text-xs text-gray-600 py-1.5 px-2">{result.concept_class_id}</td>
-                        {result.combinationyesno && (
-                          <td className="py-1.5 px-2">
-                            <span
-                              className={`badge text-xs px-1.5 py-0.5 ${
-                                result.combinationyesno === 'COMBINATION'
-                                  ? 'badge-warning'
-                                  : 'badge-success'
-                              }`}
-                            >
-                              {result.combinationyesno}
-                            </span>
-                          </td>
-                        )}
-                        {result.dose_form && (
-                          <td className="text-xs text-gray-600 py-1.5 px-2">{result.dose_form}</td>
-                        )}
-                        {result.dfg_name && (
-                          <td className="py-1.5 px-2">
-                            <span className="badge badge-info text-xs px-1.5 py-0.5">
-                              {result.dfg_name}
-                            </span>
-                          </td>
-                        )}
-                        {vocabResults.some((r) => r.value) && (
-                          <td className="text-xs text-gray-600 py-1.5 px-2">{result.value || '-'}</td>
-                        )}
-                      </tr>
-                    );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          <ChevronDown className="w-3 h-3" />
+                          Show 100 More ({remainingCount} remaining)
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showAllForVocab(vocabulary);
+                          }}
+                          className="btn-secondary text-xs px-3 py-1.5"
+                        >
+                          Show All {vocabResults.length}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );
