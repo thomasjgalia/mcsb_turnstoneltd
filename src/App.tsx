@@ -21,7 +21,8 @@ import AdminUserManagement from './components/AdminUserManagement';
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, profile, isAdmin, isApproved, loading, signOut } = useAuth();
+  //const { user, profile, isAdmin, isApproved, loading, signOut } = useAuth();
+  const { user, isAdmin, loading, signOut } = useAuth();
   const [dbConnectionStatus, setDbConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [dbErrorMessage, setDbErrorMessage] = useState<string>('');
   const [workflow, setWorkflow] = useState<'direct' | 'hierarchical' | 'labtest' | null>(null);
