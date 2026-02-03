@@ -12,7 +12,7 @@ let pool: sql.ConnectionPool | null = null;
 /**
  * Get or create Azure SQL connection pool
  */
-async function getPool(): Promise<sql.ConnectionPool> {
+export async function getPool(): Promise<sql.ConnectionPool> {
   if (pool && pool.connected) {
     return pool;
   }

@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from './lib/supabase';
 import { upsertUserProfile, testConnection } from './lib/api';
-import type { User } from '@supabase/supabase-js';
+import { useAuth } from './hooks/useAuth';
 import type { CartItem, SearchResult, DomainType } from './lib/types';
 
-// Components (will be created next)
+// Components
 import Navigation from './components/Navigation';
 import ShoppingCart from './components/ShoppingCart';
 import Landing from './components/Landing';
@@ -17,12 +16,12 @@ import Step3CodeSet from './components/Step3CodeSet';
 import SavedCodeSets from './components/SavedCodeSets';
 import AuthPage from './components/AuthPage';
 import DirectionsModal from './components/DirectionsModal';
+import AdminUserManagement from './components/AdminUserManagement';
 
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, profile, isAdmin, isApproved, loading, signOut } = useAuth();
   const [dbConnectionStatus, setDbConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [dbErrorMessage, setDbErrorMessage] = useState<string>('');
   const [workflow, setWorkflow] = useState<'direct' | 'hierarchical' | 'labtest' | null>(null);
@@ -39,50 +38,16 @@ function AppContent() {
   const [lastSearchTerm, setLastSearchTerm] = useState('');
   const [lastSearchDomain, setLastSearchDomain] = useState<DomainType | ''>('');
 
-  // Check if auth is disabled for local development
-  const authDisabled = import.meta.env.VITE_DISABLE_AUTH === 'true';
-
-  // Check for existing session on mount
+  // Upsert user profile when user logs in
   useEffect(() => {
-    // Skip auth check if disabled
-    if (authDisabled) {
-      setUser({ id: 'local-dev', email: 'dev@local.test' } as User);
-      setLoading(false);
-      return;
+    if (user) {
+      upsertUserProfile(
+        user.id,
+        user.email!,
+        user.user_metadata?.display_name
+      ).catch(err => console.error('Failed to create user profile:', err));
     }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-
-      // Create/update user profile on login
-      if (session?.user) {
-        upsertUserProfile(
-          session.user.id,
-          session.user.email!,
-          session.user.user_metadata?.display_name
-        ).catch(err => console.error('Failed to create user profile:', err));
-      }
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-
-      // Create/update user profile on auth state change
-      if (session?.user) {
-        upsertUserProfile(
-          session.user.id,
-          session.user.email!,
-          session.user.user_metadata?.display_name
-        ).catch(err => console.error('Failed to create user profile:', err));
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [authDisabled]);
+  }, [user]);
 
   // Check database connection once on app startup
   useEffect(() => {
@@ -213,15 +178,23 @@ function AppContent() {
                 >
                   My Saved Code Sets
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className="btn-secondary text-xs px-3 py-1.5"
+                  >
+                    Admin Panel
+                  </button>
+                )}
                 <button
                   onClick={() => setIsDirectionsOpen(true)}
                   className="btn-secondary text-xs px-3 py-1.5"
                 >
                   How to Use
                 </button>
-                <span className="text-xs text-gray-600">{user.email}</span>
+                <span className="text-xs text-gray-600">{user?.email}</span>
                 <button
-                  onClick={() => supabase.auth.signOut()}
+                  onClick={signOut}
                   className="btn-secondary text-xs px-3 py-1.5"
                 >
                   Sign Out
@@ -380,6 +353,10 @@ function AppContent() {
                 <Route
                   path="/saved"
                   element={<SavedCodeSets />}
+                />
+                <Route
+                  path="/admin"
+                  element={isAdmin ? <AdminUserManagement /> : <Navigate to="/" replace />}
                 />
               </Routes>
           </div>

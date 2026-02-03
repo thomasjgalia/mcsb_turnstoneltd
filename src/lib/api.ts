@@ -21,11 +21,13 @@ import type {
   LabTestSearchRequest,
   LabTestSearchResult,
   LabTestPanelSearchResult,
+  AdminUsersResponse,
+  AdminAuditLogResponse,
 } from './types';
 
-// In development with Vercel Dev, API routes are served on the same origin
-// In production, API routes are also on the same origin
-const API_BASE_URL = '';
+// In development, point to the local API server
+// In production (Vercel), API routes are on the same origin
+const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -293,7 +295,7 @@ export const upsertUserProfile = async (
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
     const response = await apiClient.get<ApiResponse<UserProfile>>(
-      `/api/user/profile/${userId}`
+      `/api/user/profile?userId=${userId}`
     );
 
     if (!response.data.success) {
@@ -503,3 +505,164 @@ export const getSearchHistory = async (
 //     return handleApiError(error);
 //   }
 // };
+
+// ============================================================================
+// Admin API Functions
+// ============================================================================
+
+/**
+ * Get list of users (admin only)
+ */
+export const getAdminUsers = async (
+  page: number = 1,
+  pageSize: number = 20,
+  search: string = '',
+  status: 'all' | 'approved' | 'pending' = 'all'
+): Promise<AdminUsersResponse> => {
+  try {
+    const params = new URLSearchParams({
+      action: 'users',
+      page: page.toString(),
+      pageSize: pageSize.toString(),
+      search,
+      status,
+    });
+
+    const response = await apiClient.get<ApiResponse<AdminUsersResponse>>(
+      `/api/admin?${params}`
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch users');
+    }
+
+    return response.data.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+/**
+ * Get single user details (admin only)
+ */
+export const getAdminUser = async (userId: string): Promise<UserProfile> => {
+  try {
+    const params = new URLSearchParams({
+      action: 'user',
+      userId,
+    });
+
+    const response = await apiClient.get<ApiResponse<UserProfile>>(
+      `/api/admin?${params}`
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch user');
+    }
+
+    return response.data.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+/**
+ * Approve user (admin only)
+ */
+export const approveUser = async (userId: string): Promise<void> => {
+  try {
+    const params = new URLSearchParams({
+      action: 'approve',
+      userId,
+    });
+
+    const response = await apiClient.put<ApiResponse<void>>(
+      `/api/admin?${params}`
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to approve user');
+    }
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+/**
+ * Suspend user (admin only)
+ */
+export const suspendUser = async (
+  userId: string,
+  reason: string = ''
+): Promise<void> => {
+  try {
+    const params = new URLSearchParams({
+      action: 'suspend',
+      userId,
+      reason,
+    });
+
+    const response = await apiClient.put<ApiResponse<void>>(
+      `/api/admin?${params}`
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to suspend user');
+    }
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+/**
+ * Delete user (admin only)
+ */
+export const deleteUser = async (
+  userId: string,
+  reason: string = ''
+): Promise<void> => {
+  try {
+    const params = new URLSearchParams({
+      userId,
+      reason,
+    });
+
+    const response = await apiClient.delete<ApiResponse<void>>(
+      `/api/admin?${params}`
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to delete user');
+    }
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+/**
+ * Get audit log (admin only)
+ */
+export const getAdminAuditLog = async (
+  page: number = 1,
+  pageSize: number = 20
+): Promise<AdminAuditLogResponse> => {
+  try {
+    const params = new URLSearchParams({
+      action: 'audit',
+      page: page.toString(),
+      pageSize: pageSize.toString(),
+    });
+
+    const response = await apiClient.get<ApiResponse<AdminAuditLogResponse>>(
+      `/api/admin?${params}`
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch audit log');
+    }
+
+    return response.data.data;
+  } catch (error) {
+    return handleApiError(error);
+  }
+};

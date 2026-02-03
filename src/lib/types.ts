@@ -159,6 +159,8 @@ export interface UserProfile {
   supabase_user_id: string;
   email: string;
   display_name?: string;
+  role: 'user' | 'admin'; // User role for authorization
+  is_approved: boolean; // User approval status
   preferences?: string; // JSON string
   created_at: string;
   updated_at: string;
@@ -169,6 +171,48 @@ export interface UserPreferences {
   theme?: 'light' | 'dark';
   show_search_history?: boolean;
   recent_search_limit?: number;
+}
+
+// ============================================================================
+// Admin Types
+// ============================================================================
+export interface AdminUserListItem {
+  supabase_user_id: string;
+  email: string;
+  display_name?: string;
+  role: 'user' | 'admin';
+  is_approved: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminAuditLogEntry {
+  id: number;
+  action_type: string;
+  admin_email?: string;
+  target_email?: string;
+  details: string; // JSON string
+  created_at: string;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUserListItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface AdminAuditLogResponse {
+  logs: AdminAuditLogEntry[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface SavedCodeSetRecord {

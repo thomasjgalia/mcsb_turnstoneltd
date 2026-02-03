@@ -1,0 +1,117 @@
+
+/* **************************************************************
+   Step 1
+   Lab Tests
+   ************************************************************** */
+
+-- Select database/schema
+SET db  = 'UDP_QA_REF_DATA';
+SET sch = 'LSMI_OMOP';
+USE DATABASE IDENTIFIER($db);
+USE SCHEMA   IDENTIFIER($sch);
+
+-- --- User input (optional). Examples:
+-- SET searchterm = 'glucose';
+-- SET searchterm = '2345-7';
+ SET searchterm = 'hemoglobin';
+-- For full set, leave empty:
+-- SET searchterm = '';
+
+WITH base AS (  -- ~scopes from the start
+  SELECT CONCEPT_ID, CONCEPT_NAME, CONCEPT_CODE, CONCEPT_CLASS_ID, VOCABULARY_ID
+  FROM CONCEPT
+  WHERE DOMAIN_ID = 'Measurement' AND VOCABULARY_ID IN ('LOINC', 'CPT4', 'HCPCS','SNOMED') --AND CONCEPT_CLASS_ID = 'Lab Test'
+  AND ( VOCABULARY_ID = 'LOINC' AND CONCEPT_CLASS_ID = 'Lab Test'
+  OR   VOCABULARY_ID = 'CPT4'
+  OR   VOCABULARY_ID = 'SNOMED'
+  OR VOCABULARY_ID = 'HCPCS' AND CONCEPT_CLASS_ID = 'HCPCS')
+   AND CONCAT(TO_CHAR(CONCEPT_ID), ' ', UPPER(CONCEPT_CODE), ' ', UPPER(CONCEPT_NAME))
+      LIKE CONCAT('%', UPPER($searchterm), '%')
+)
+,
+prop AS (
+  SELECT CONCEPT_ID_1, CONCEPT_ID_2
+  FROM CONCEPT_RELATIONSHIP  WHERE RELATIONSHIP_ID = 'Has property'
+  --  AND COALESCE(INVALID_REASON, '') = ''         -- only valid relationships
+),
+scale AS (
+  SELECT CONCEPT_ID_1, CONCEPT_ID_2
+  FROM CONCEPT_RELATIONSHIP   WHERE RELATIONSHIP_ID = 'Has scale type'
+  --  AND COALESCE(INVALID_REASON, '') = ''
+),
+sys AS (
+  SELECT CONCEPT_ID_1, CONCEPT_ID_2
+  FROM CONCEPT_RELATIONSHIP   WHERE RELATIONSHIP_ID = 'Has system'
+   -- AND COALESCE(INVALID_REASON, '') = ''
+),
+tm AS (
+  SELECT CONCEPT_ID_1, CONCEPT_ID_2
+  FROM CONCEPT_RELATIONSHIP   WHERE RELATIONSHIP_ID = 'Has time aspect'
+  --  AND COALESCE(INVALID_REASON, '') = ''
+),
+panel AS (
+  /* For each lab test (concept_id_1), get the panel concept (concept_id_2) */
+  SELECT
+    CR.CONCEPT_ID_1,
+    CR.CONCEPT_ID_2,
+    C.CONCEPT_ID   AS PANEL_CONCEPT_ID,
+    C.CONCEPT_NAME AS PANEL_CONCEPT_NAME,
+    C.CONCEPT_CODE AS PANEL_CONCEPT_CODE
+  FROM CONCEPT_RELATIONSHIP CR
+  JOIN CONCEPT C     ON C.CONCEPT_ID = CR.CONCEPT_ID_2
+  WHERE CR.RELATIONSHIP_ID = 'Contained in panel'
+   -- AND COALESCE(CR.INVALID_REASON, '') = ''
+   -- AND COALESCE(C.INVALID_REASON, '')  = ''
+)
+,
+term AS (
+SELECT
+'Lab Test' AS Lab_Test_Type,
+  b.CONCEPT_ID        AS Term_concept,
+  b.CONCEPT_ID            AS STD_CONCEPT_ID,
+  b.CONCEPT_NAME          AS SEARCH_RESULT,
+  b.CONCEPT_CODE          AS SEARCHED_CODE,
+  b.CONCEPT_CLASS_ID      AS SEARCHED_CONCEPT_CLASS_ID,
+  b.VOCABULARY_ID,
+  p_c.CONCEPT_NAME        AS PROPERTY,
+  sc_c.CONCEPT_NAME       AS SCALE,
+  sy_c.CONCEPT_NAME       AS SYSTEM,
+  t_c.CONCEPT_NAME        AS TIME,
+  pn.PANEL_CONCEPT_ID     AS PANEL_CONCEPT_ID,
+  pn.PANEL_CONCEPT_CODE   AS PANEL_CODE,
+  pn.PANEL_CONCEPT_NAME   AS PANEL_NAME
+FROM base b
+LEFT JOIN prop p           ON p.CONCEPT_ID_1 = b.CONCEPT_ID
+LEFT JOIN CONCEPT p_c      ON p_c.CONCEPT_ID = p.CONCEPT_ID_2 AND COALESCE(p_c.INVALID_REASON,'')=''
+LEFT JOIN scale s          ON s.CONCEPT_ID_1 = b.CONCEPT_ID
+LEFT JOIN CONCEPT sc_c     ON sc_c.CONCEPT_ID = s.CONCEPT_ID_2 AND COALESCE(sc_c.INVALID_REASON,'')=''
+LEFT JOIN sys sy           ON sy.CONCEPT_ID_1 = b.CONCEPT_ID
+LEFT JOIN CONCEPT sy_c     ON sy_c.CONCEPT_ID = sy.CONCEPT_ID_2 AND COALESCE(sy_c.INVALID_REASON,'')=''
+LEFT JOIN tm t             ON t.CONCEPT_ID_1 = b.CONCEPT_ID
+LEFT JOIN CONCEPT t_c      ON t_c.CONCEPT_ID = t.CONCEPT_ID_2 AND COALESCE(t_c.INVALID_REASON,'')=''
+LEFT JOIN panel pn         ON pn.CONCEPT_ID_1 = b.CONCEPT_ID
+)
+,
+LOINCpanel AS(
+SELECT
+'Panel' AS Lab_Test_Type,
+  T.STD_CONCEPT_ID Term_concept,
+  C.CONCEPT_ID            AS STD_CONCEPT_ID,
+  C.CONCEPT_NAME          AS SEARCH_RESULT,
+  C.CONCEPT_CODE          AS SEARCHED_CODE,
+  C.CONCEPT_CLASS_ID      AS SEARCHED_CONCEPT_CLASS_ID,
+  C.VOCABULARY_ID,
+  NULL        AS PROPERTY,
+  NULL      AS SCALE,
+  NULL       AS SYSTEM,
+  NULL       AS TIME,
+  NULL     AS PANEL_CONCEPT_ID,
+  NULL   AS PANEL_CODE,
+  C.CONCEPT_NAME   AS PANEL_NAME
+  FROM CONCEPT C
+  JOIN term T ON T.PANEL_CONCEPT_ID = C.CONCEPT_ID
+) 
+SELECT * FROM term 
+UNION ALL
+SELECT * FROM LOINCpanel
+;

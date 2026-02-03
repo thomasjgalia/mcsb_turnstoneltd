@@ -6,7 +6,6 @@
 // ============================================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
-  executeQuery,
   executeStoredProcedure,
   createErrorResponse,
 } from './lib/azuresql.js';
@@ -83,57 +82,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle Lab Test Build (same as Direct Build - no hierarchical expansion)
     if (build_type === 'labtest') {
       const startTime = Date.now();
-      console.log(`🧪 Lab Test Build: Starting for ${concept_ids.length} concepts`);
+      console.log(`🧪 Lab Test Build: Using stored procedure for ${concept_ids.length} concepts`);
 
-      const placeholders = concept_ids.map((_, i) => `@concept_id${i}`).join(',');
-      const parameters: Record<string, number> = {};
-      concept_ids.forEach((id, i) => {
-        parameters[`concept_id${i}`] = id;
-      });
-
-      const labtestSQL = `
-        SELECT
-          C.CONCEPT_NAME                      AS root_concept_name,
-          C.VOCABULARY_ID                     AS child_vocabulary_id,
-          C.CONCEPT_CODE                      AS child_code,
-          C.CONCEPT_NAME                      AS child_name,
-          C.CONCEPT_ID                        AS child_concept_id,
-          C.CONCEPT_CLASS_ID                  AS concept_class_id,
-          NULL                                AS combinationyesno,
-          NULL                                AS dose_form,
-          NULL                                AS dfg_name,
-          NULL                                AS concept_attribute,
-          NULL                                AS value,
-          JSON_QUERY((
-            SELECT
-              CR2.RELATIONSHIP_ID as relationship_id,
-              S2.CONCEPT_NAME as value_name
-            FROM CONCEPT_RELATIONSHIP CR2
-            INNER JOIN CONCEPT S2 ON S2.CONCEPT_ID = CR2.CONCEPT_ID_2
-            WHERE CR2.concept_id_1 = C.concept_id
-              AND CR2.RELATIONSHIP_ID IN (
-                'RxNorm has dose form',
-                'Has property',
-                'Has scale type',
-                'Has system',
-                'Has time aspect',
-                'Has asso morph',
-                'Has finding site',
-                'Has component'
-              )
-            ORDER BY CR2.RELATIONSHIP_ID
-            FOR JSON PATH
-          )) AS relationships_json
-        FROM CONCEPT C
-        WHERE C.CONCEPT_ID IN (${placeholders})
-        ORDER BY C.VOCABULARY_ID, C.CONCEPT_CODE
-      `;
-
-      console.log(`📊 Lab Test Build: Executing single query with IN clause for ${concept_ids.length} IDs`);
-      const results = await executeQuery<CodeSetResult>(labtestSQL, parameters);
+      const tvpRows = concept_ids.map(id => [id]);
+      const results = await executeStoredProcedure<CodeSetResult>(
+        'dbo.sp_BuildCodeSet_LabTest',
+        {},
+        {
+          name: 'ConceptIds',
+          typeName: 'dbo.ConceptIdList',
+          rows: tvpRows
+        }
+      );
 
       // Parse relationships_json into actual objects
-      const parsedResults = results.map(r => ({
+      const parsedResults = results.map((r: CodeSetResult) => ({
         ...r,
         relationships: r.relationships_json ? JSON.parse(r.relationships_json) : []
       }));
@@ -156,36 +119,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Handle Direct Build (no hierarchical expansion)
     if (build_type === 'direct') {
       const startTime = Date.now();
-      console.log(`🚀 Direct Build: Starting for ${concept_ids.length} concepts`);
+      console.log(`🚀 Direct Build: Using stored procedure for ${concept_ids.length} concepts`);
 
-      const placeholders = concept_ids.map((_, i) => `@concept_id${i}`).join(',');
-      const parameters: Record<string, number> = {};
-      concept_ids.forEach((id, i) => {
-        parameters[`concept_id${i}`] = id;
-      });
+      const tvpRows = concept_ids.map(id => [id]);
+      const results = await executeStoredProcedure<CodeSetResult>(
+        'dbo.sp_BuildCodeSet_Direct',
+        {},
+        {
+          name: 'ConceptIds',
+          typeName: 'dbo.ConceptIdList',
+          rows: tvpRows
+        }
+      );
 
-      const directSQL = `
-        SELECT
-          C.CONCEPT_NAME                      AS root_concept_name,
-          C.VOCABULARY_ID                     AS child_vocabulary_id,
-          C.CONCEPT_CODE                      AS child_code,
-          C.CONCEPT_NAME                      AS child_name,
-          C.CONCEPT_ID                        AS child_concept_id,
-          C.CONCEPT_CLASS_ID                  AS concept_class_id,
-          NULL                                AS combinationyesno,
-          NULL                                AS dose_form,
-          NULL                                AS dfg_name,
-          NULL                                AS concept_attribute,
-          NULL                                AS value
-        FROM CONCEPT C
-        WHERE C.CONCEPT_ID IN (${placeholders})
-        ORDER BY C.VOCABULARY_ID, C.CONCEPT_CODE
-      `;
-
-      console.log(`📊 Direct Build: Executing single query with IN clause for ${concept_ids.length} IDs`);
-      console.log('🔍 SQL Query:', directSQL);
-      console.log('🔍 Parameters:', parameters);
-      const results = await executeQuery<CodeSetResult>(directSQL, parameters);
       allResults.push(...results);
 
       const duration = Date.now() - startTime;
@@ -201,177 +147,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Handle Hierarchical Build - Dual Path Implementation
-    const useStoredProcs = process.env.USE_STORED_PROCEDURES === 'true';
+    // Handle Hierarchical Build using stored procedure
     const startTime = Date.now();
+    console.log(`🚀 Hierarchical Build: Using stored procedure for ${concept_ids.length} concepts`);
 
-    if (useStoredProcs) {
-      // NEW PATH: Use stored procedure (2 queries instead of 2*N)
-      console.log(`🚀 Hierarchical Build: Using stored procedure for ${concept_ids.length} concepts`);
-
-      try {
-        const tvpRows = concept_ids.map(id => [id]);
-        const results = await executeStoredProcedure<CodeSetResult>(
-          'dbo.sp_BuildCodeSet_Hierarchical',
-          { ComboFilter: combo_filter },
-          {
-            name: 'ConceptIds',
-            typeName: 'dbo.ConceptIdList',
-            rows: tvpRows
-          }
-        );
-
-        allResults.push(...results);
-        const duration = Date.now() - startTime;
-        console.log(`✅ Stored procedure completed in ${duration}ms - returned ${results.length} results`);
-      } catch (error) {
-        console.error('❌ Stored procedure failed, falling back to dynamic queries:', error);
-        // Fall through to old path below
+    const tvpRows = concept_ids.map(id => [id]);
+    const results = await executeStoredProcedure<CodeSetResult>(
+      'dbo.sp_BuildCodeSet_Hierarchical',
+      { ComboFilter: combo_filter },
+      {
+        name: 'ConceptIds',
+        typeName: 'dbo.ConceptIdList',
+        rows: tvpRows
       }
-    }
+    );
 
-    // OLD PATH: Dynamic queries (fallback if stored proc fails or feature flag is off)
-    if (!useStoredProcs || allResults.length === 0) {
-      console.log(`🔄 Hierarchical Build: Using dynamic queries for ${concept_ids.length} concepts`);
-
-      for (const conceptId of concept_ids) {
-      // Get domain for this concept
-      const domainSQL = `SELECT domain_id FROM concept WHERE concept_id = @concept_id`;
-      const domainResult = await executeQuery<{ domain_id: string }>(domainSQL, {
-        concept_id: conceptId,
-      });
-
-      if (domainResult.length === 0) {
-        console.warn(`Concept ${conceptId} not found, skipping`);
-        continue;
-      }
-
-      const domain_id = domainResult[0].domain_id;
-
-      // Build vocabulary IN clause based on domain
-      let vocabularyList: string;
-      switch (domain_id) {
-        case 'Condition':
-          vocabularyList = "('ICD10CM','SNOMED','ICD9CM')";
-          break;
-        case 'Observation':
-          vocabularyList = "('ICD10CM','SNOMED','LOINC','CPT4','HCPCS')";
-          break;
-        case 'Drug':
-          vocabularyList = "('RxNorm','NDC','CPT4','CVX','HCPCS','ATC')";
-          break;
-        case 'Measurement':
-          vocabularyList = "('LOINC','CPT4','SNOMED','HCPCS')";
-          break;
-        case 'Procedure':
-          vocabularyList = "('CPT4','HCPCS','SNOMED','ICD09PCS','LOINC','ICD10PCS')";
-          break;
-        default:
-          vocabularyList = "('')";
-      }
-
-      // Build the code set query (v3 - added concept_attribute)
-      const sql = `
-        SELECT
-          c.concept_name                      AS root_concept_name,
-          d.vocabulary_id                     AS child_vocabulary_id,
-          d.concept_code                      AS child_code,
-          d.concept_name                      AS child_name,
-          d.concept_id                        AS child_concept_id,
-          d.concept_class_id                  AS concept_class_id,
-          CASE
-            WHEN d.concept_class_id = 'Multiple Ingredients' THEN 'COMBINATION'
-            ELSE combo.combinationyesno
-          END                                 AS combinationyesno,
-          frm.concept_name                    AS dose_form,
-          dfglbl.dfg_label                    AS dfg_name,
-          attr.concept_attribute              AS concept_attribute,
-          attr.value                          AS value
-        FROM concept c
-        JOIN concept_ancestor ca
-          ON ca.ancestor_concept_id = c.concept_id
-        JOIN concept_relationship cr
-          ON cr.concept_id_2 = ca.descendant_concept_id
-         AND cr.relationship_id = 'Maps to'
-        JOIN concept d
-          ON d.concept_id = cr.concept_id_1
-         AND d.domain_id  = @domain_id
-         AND d.vocabulary_id IN ${vocabularyList}
-        LEFT JOIN concept_attribute attr
-          ON attr.concept_id = ca.descendant_concept_id
-        LEFT JOIN concept_relationship f
-          ON f.concept_id_1   = ca.descendant_concept_id
-         AND f.relationship_id = 'RxNorm has dose form'
-        LEFT JOIN concept frm
-          ON frm.concept_id = f.concept_id_2
-        LEFT JOIN (
-          SELECT
-            frm.concept_id AS dose_form_id,
-            CASE
-              WHEN UPPER(frm.concept_name) LIKE '%INJECT%' OR UPPER(frm.concept_name) LIKE '%SYRINGE%' OR UPPER(frm.concept_name) LIKE '%AUTO-INJECTOR%' OR UPPER(frm.concept_name) LIKE '%CARTRIDGE%' THEN 'Injectable Product'
-              WHEN UPPER(frm.concept_name) LIKE '%ORAL TABLET%' OR UPPER(frm.concept_name) LIKE '%TABLET%' OR UPPER(frm.concept_name) LIKE '%ORAL%' OR UPPER(frm.concept_name) LIKE '%LOZENGE%' THEN 'Oral'
-              WHEN UPPER(frm.concept_name) LIKE '%BUCCAL%' OR UPPER(frm.concept_name) LIKE '%SUBLINGUAL%' THEN 'Buccal/Sublingual Product'
-              WHEN UPPER(frm.concept_name) LIKE '%INHAL%' THEN 'Inhalant Product'
-              WHEN UPPER(frm.concept_name) LIKE '%NASAL%' THEN 'Nasal Product'
-              WHEN UPPER(frm.concept_name) LIKE '%OPHTHALMIC%' THEN 'Ophthalmic Product'
-              WHEN UPPER(frm.concept_name) LIKE '%TOPICAL%' THEN 'Topical Product'
-              WHEN UPPER(frm.concept_name) LIKE '%PATCH%' OR UPPER(frm.concept_name) LIKE '%MEDICATED PAD%' OR UPPER(frm.concept_name) LIKE '%MEDICATED TAPE%' THEN 'Transdermal/Patch Product'
-              WHEN UPPER(frm.concept_name) LIKE '%SUPPOSITORY%' THEN 'Suppository Product'
-              WHEN UPPER(frm.concept_name) LIKE '%IMPLANT%' OR UPPER(frm.concept_name) LIKE '%INTRAUTERINE SYSTEM%' THEN 'Drug Implant Product'
-              WHEN UPPER(frm.concept_name) LIKE '%IRRIGATION%' THEN 'Irrigation Product'
-              WHEN UPPER(frm.concept_name) LIKE '%INTRAVESICAL%' THEN 'Intravesical Product'
-              WHEN UPPER(frm.concept_name) LIKE '%INTRATRACHEAL%' THEN 'Intratracheal Product'
-              WHEN UPPER(frm.concept_name) LIKE '%INTRAPERITONEAL%' THEN 'Intraperitoneal Product'
-              ELSE 'Other'
-            END AS dfg_label
-          FROM concept frm
-        ) dfglbl
-          ON dfglbl.dose_form_id = frm.concept_id
-        LEFT JOIN (
-          SELECT
-            ca.descendant_concept_id,
-            CASE WHEN COUNT(*) > 1 THEN 'COMBINATION'
-                 WHEN COUNT(*) = 1 THEN 'SINGLE'
-            END AS combinationyesno
-          FROM concept_ancestor ca
-          JOIN concept a
-            ON a.concept_id = ca.ancestor_concept_id
-          WHERE a.concept_class_id = 'Ingredient'
-          GROUP BY ca.descendant_concept_id
-        ) combo
-          ON combo.descendant_concept_id = ca.descendant_concept_id
-        WHERE
-          c.concept_id = @concept_id
-          AND (
-               d.domain_id <> 'Drug'
-            OR (
-                 (
-                   UPPER(@combo) = 'ALL'
-                   OR CASE
-                        WHEN d.concept_class_id = 'Multiple Ingredients' THEN 'COMBINATION'
-                        ELSE combo.combinationyesno
-                      END = UPPER(@combo)
-                 )
-                 AND d.concept_class_id IN (
-                   'Clinical Drug','Branded Drug Form','Clinical Drug Form',
-                   'Quant Branded Drug','Quant Clinical Drug','11-digit NDC'
-                 )
-               )
-          )
-        ORDER BY d.vocabulary_id DESC, ca.min_levels_of_separation ASC
-      `;
-
-      const results = await executeQuery<CodeSetResult>(sql, {
-        concept_id: conceptId,
-        domain_id,
-        combo: combo_filter,
-      });
-      allResults.push(...results);
-    }
-
-      const duration = Date.now() - startTime;
-      console.log(`✅ Dynamic queries completed in ${duration}ms - returned ${allResults.length} results`);
-    }
+    allResults.push(...results);
+    const duration = Date.now() - startTime;
+    console.log(`✅ Stored procedure completed in ${duration}ms - returned ${results.length} results`);
 
     // Deduplicate results based on vocabulary, code, name, concept_id, and class
     const deduped = deduplicateResults(allResults);

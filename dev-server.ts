@@ -27,6 +27,7 @@ import codesetHandler from './api/codeset.js';
 import profileHandler from './api/user/profile.js';
 import codesetsHandler from './api/user/codesets.js';
 import searchHistoryHandler from './api/user/search-history.js';
+import adminHandler from './api/admin.js';
 
 // Wrapper to convert Vercel handlers to Express handlers
 const vercelToExpress = (handler: any) => {
@@ -75,7 +76,7 @@ app.post('/api/codeset', vercelToExpress(codesetHandler));
 
 // User API Routes
 app.post('/api/user/profile', vercelToExpress(profileHandler));
-app.get('/api/user/profile/:userId', vercelToExpress(profileHandler));
+app.get('/api/user/profile', vercelToExpress(profileHandler));
 
 // Code sets routes - order matters! More specific routes first
 app.post('/api/user/codesets', vercelToExpress(codesetsHandler));
@@ -85,6 +86,11 @@ app.delete('/api/user/codesets', vercelToExpress(codesetsHandler)); // Delete co
 // Search history routes
 app.post('/api/user/search-history', vercelToExpress(searchHistoryHandler));
 app.get('/api/user/search-history/:userId', vercelToExpress(searchHistoryHandler));
+
+// Admin routes
+app.get('/api/admin', vercelToExpress(adminHandler));
+app.put('/api/admin', vercelToExpress(adminHandler));
+app.delete('/api/admin', vercelToExpress(adminHandler));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -104,5 +110,6 @@ app.listen(PORT, () => {
   console.log('  SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? '✓ Set' : '✗ Not set');
   console.log('  OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✓ Set' : '✗ Not set');
   console.log('  UMLS_API_KEY:', process.env.UMLS_API_KEY ? '✓ Set' : '✗ Not set');
+  console.log('  RESEND_API_KEY:', process.env.RESEND_API_KEY ? '✓ Set' : '✗ Not set');
   console.log('\n');
 });
