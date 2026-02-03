@@ -4,6 +4,7 @@
   "description": "Backend API for Medical Code Set Builder",
   "type": "module",
   "dependencies": {
+    "@azure/functions": "^4.11.1",
     "@supabase/supabase-js": "^2.39.7",
     "mssql": "^12.2.0",
     "oracledb": "^6.3.0"

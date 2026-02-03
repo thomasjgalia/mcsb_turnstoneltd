@@ -1,0 +1,54 @@
+{
+  "query": "blood glucose",
+  "analysis": {
+    "concepts": [
+      {
+        "original_term": "blood glucose",
+        "search_term": "glucose",
+        "domain": "Measurement",
+        "is_drug_class": false,
+        "individual_drugs": null,
+        "hierarchy_level": "specific"
+      }
+    ],
+    "filters": {
+      "combination": "SINGLE",
+      "dose_form": null,
+      "exclude_terms": [],
+      "scale_type": "Qn",
+      "system": "Blood"
+    },
+    "strategy": "attribute-based",
+    "reasoning": "This is a laboratory measurement. Per OMOP measurement strategy, the term is simplified to 'glucose' and refined using attributes such as quantitative scale type and blood system rather than hierarchy navigation."
+  },
+  "selected_concept_id": null,
+  "selected_concept_name": "Measurement attribute search",
+  "codes": [
+    {
+      "CHILD_NAME": "Glucose [Mass/volume] in Blood",
+      "CHILD_CODE": "2339-0",
+      "CHILD_VOCABULARY_ID": "LOINC",
+      "CHILD_CONCEPT_ID": 3000483,
+      "ROOT_CONCEPT_NAME": "Measurement attribute search",
+      "CONCEPT_CLASS_ID": "Measurement",
+      "DOMAIN_ID": "Measurement",
+      "INVALID_REASON": null,
+      "HIERARCHY_DEPTH": 0,
+      "RELATIONSHIPS": null
+    },
+    {
+      "CHILD_NAME": "Glucose [Moles/volume] in Blood",
+      "CHILD_CODE": "15074-8",
+      "CHILD_VOCABULARY_ID": "LOINC",
+      "CHILD_CONCEPT_ID": 3020491,
+      "ROOT_CONCEPT_NAME": "Measurement attribute search",
+      "CONCEPT_CLASS_ID": "Measurement",
+      "DOMAIN_ID": "Measurement",
+      "INVALID_REASON": null,
+      "HIERARCHY_DEPTH": 0,
+      "RELATIONSHIPS": null
+    }
+  ],
+  "strategy": "attribute-based",
+  "total_codes": 49
+}

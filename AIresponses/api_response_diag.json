@@ -1,0 +1,54 @@
+{
+  "query": "adult onset diabetes",
+  "analysis": {
+    "concepts": [
+      {
+        "original_term": "adult onset diabetes",
+        "search_term": "type 2 diabetes mellitus",
+        "domain": "Condition",
+        "is_drug_class": false,
+        "individual_drugs": null,
+        "hierarchy_level": "specific"
+      }
+    ],
+    "filters": {
+      "combination": "SINGLE",
+      "dose_form": null,
+      "exclude_terms": [],
+      "scale_type": null,
+      "system": null
+    },
+    "strategy": "3-step-hierarchy",
+    "reasoning": "Adult onset diabetes is a common synonym for Type 2 diabetes mellitus, a condition best represented by a specific SNOMED standard concept and expanded via the condition hierarchy to include mapped ICD10CM and ICD9CM codes."
+  },
+  "selected_concept_id": 201826,
+  "selected_concept_name": "Type 2 diabetes mellitus",
+  "codes": [
+    {
+      "ROOT_CONCEPT_NAME": "Type 2 diabetes mellitus",
+      "CHILD_VOCABULARY_ID": "SNOMED",
+      "CHILD_CODE": "154672006",
+      "CHILD_NAME": "Diabetes mellitus: [adult onset] or [noninsulin dependent]",
+      "CHILD_CONCEPT_ID": 40320749,
+      "CONCEPT_CLASS_ID": "Disorder",
+      "DOMAIN_ID": "Condition",
+      "INVALID_REASON": "U",
+      "HIERARCHY_DEPTH": 0,
+      "RELATIONSHIPS": NaN
+    },
+    {
+      "ROOT_CONCEPT_NAME": "Type 2 diabetes mellitus",
+      "CHILD_VOCABULARY_ID": "SNOMED",
+      "CHILD_CODE": "267468009",
+      "CHILD_NAME": "Diabetes mellitus: [adult onset] or [noninsulin dependent]",
+      "CHILD_CONCEPT_ID": 40350832,
+      "CONCEPT_CLASS_ID": "Disorder",
+      "DOMAIN_ID": "Condition",
+      "INVALID_REASON": "D",
+      "HIERARCHY_DEPTH": 0,
+      "RELATIONSHIPS": NaN
+    }
+  ],
+  "strategy": "3-step-hierarchy",
+  "total_codes": 65
+}

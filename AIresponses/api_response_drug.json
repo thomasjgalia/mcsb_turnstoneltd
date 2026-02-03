@@ -1,0 +1,78 @@
+{
+  "query": "lisinopril",
+  "analysis": {
+    "concepts": [
+      {
+        "original_term": "lisinopril",
+        "search_term": "lisinopril",
+        "domain": "Drug",
+        "is_drug_class": false,
+        "individual_drugs": null,
+        "hierarchy_level": "ingredient"
+      }
+    ],
+    "filters": {
+      "combination": "SINGLE",
+      "dose_form": null,
+      "exclude_terms": [],
+      "scale_type": null,
+      "system": null
+    },
+    "strategy": "3-step-hierarchy",
+    "reasoning": "The query is a specific drug name. Lisinopril is an RxNorm ingredient-level drug, not a drug class. The appropriate strategy is to start from the RxNorm ingredient and use the drug hierarchy to retrieve related clinical and branded drug concepts if needed."
+  },
+  "selected_concept_id": 1308216,
+  "selected_concept_name": "lisinopril",
+  "codes": [
+    {
+      "ROOT_CONCEPT_NAME": "lisinopril",
+      "CHILD_VOCABULARY_ID": "SNOMED",
+      "CHILD_CODE": "318880006",
+      "CHILD_NAME": "Hydrochlorothiazide 12.5 mg and lisinopril 20 mg oral tablet",
+      "CHILD_CONCEPT_ID": 4204113,
+      "CONCEPT_CLASS_ID": "Clinical Drug",
+      "DOMAIN_ID": "Drug",
+      "INVALID_REASON": NaN,
+      "HIERARCHY_DEPTH": 2,
+      "RELATIONSHIPS": "[{\"relationship_id\":\"Is a\",\"value_name\":\"Hydrochlorothiazide and lisinopril only product in oral dose form\",\"value_concept\":36681899}]"
+    },
+    {
+      "ROOT_CONCEPT_NAME": "lisinopril",
+      "CHILD_VOCABULARY_ID": "SNOMED",
+      "CHILD_CODE": "318884002",
+      "CHILD_NAME": "Hydrochlorothiazide 12.5 mg and lisinopril 10 mg oral tablet",
+      "CHILD_CONCEPT_ID": 4204562,
+      "CONCEPT_CLASS_ID": "Clinical Drug",
+      "DOMAIN_ID": "Drug",
+      "INVALID_REASON": NaN,
+      "HIERARCHY_DEPTH": 2,
+      "RELATIONSHIPS": "[{\"relationship_id\":\"Is a\",\"value_name\":\"Hydrochlorothiazide and lisinopril only product in oral dose form\",\"value_concept\":36681899}]"
+    },
+    {
+      "ROOT_CONCEPT_NAME": "lisinopril",
+      "CHILD_VOCABULARY_ID": "SNOMED",
+      "CHILD_CODE": "318859000",
+      "CHILD_NAME": "Lisinopril 10 mg oral tablet",
+      "CHILD_CONCEPT_ID": 4200596,
+      "CONCEPT_CLASS_ID": "Clinical Drug",
+      "DOMAIN_ID": "Drug",
+      "INVALID_REASON": NaN,
+      "HIERARCHY_DEPTH": 2,
+      "RELATIONSHIPS": "[{\"relationship_id\":\"Is a\",\"value_name\":\"Lisinopril only product in oral dose form\",\"value_concept\":36682151}]"
+    },
+    {
+      "ROOT_CONCEPT_NAME": "lisinopril",
+      "CHILD_VOCABULARY_ID": "SNOMED",
+      "CHILD_CODE": "318860005",
+      "CHILD_NAME": "Lisinopril 20 mg oral tablet",
+      "CHILD_CONCEPT_ID": 4200597,
+      "CONCEPT_CLASS_ID": "Clinical Drug",
+      "DOMAIN_ID": "Drug",
+      "INVALID_REASON": NaN,
+      "HIERARCHY_DEPTH": 2,
+      "RELATIONSHIPS": "[{\"relationship_id\":\"Is a\",\"value_name\":\"Lisinopril only product in oral dose form\",\"value_concept\":36682151}]"
+    }
+  ],
+  "strategy": "3-step-hierarchy",
+  "total_codes": 5263
+}

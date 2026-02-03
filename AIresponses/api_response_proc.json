@@ -1,0 +1,54 @@
+{
+  "query": "hysterectomy procedure",
+  "analysis": {
+    "concepts": [
+      {
+        "original_term": "hysterectomy procedure",
+        "search_term": "hysterectomy",
+        "domain": "Procedure",
+        "is_drug_class": false,
+        "individual_drugs": null,
+        "hierarchy_level": "broad"
+      }
+    ],
+    "filters": {
+      "combination": "SINGLE",
+      "dose_form": null,
+      "exclude_terms": [],
+      "scale_type": null,
+      "system": null
+    },
+    "strategy": "direct-search",
+    "reasoning": "Hysterectomy is a surgical intervention, which falls under the Procedure domain. Procedures use a direct term search strategy across vocabularies such as CPT4, HCPCS, SNOMED, ICD9PCS, and ICD10PCS, with minimal reliance on hierarchy."
+  },
+  "selected_concept_id": null,
+  "selected_concept_name": "Direct search",
+  "codes": [
+    {
+      "CHILD_NAME": "Hysterectomy",
+      "CHILD_CODE": "236886002",
+      "CHILD_VOCABULARY_ID": "SNOMED",
+      "CHILD_CONCEPT_ID": 4127886,
+      "ROOT_CONCEPT_NAME": "Direct search",
+      "CONCEPT_CLASS_ID": null,
+      "DOMAIN_ID": null,
+      "INVALID_REASON": null,
+      "HIERARCHY_DEPTH": 0,
+      "RELATIONSHIPS": null
+    },
+    {
+      "CHILD_NAME": "H/O: hysterectomy",
+      "CHILD_CODE": "161800001",
+      "CHILD_VOCABULARY_ID": "SNOMED",
+      "CHILD_CONCEPT_ID": 4058563,
+      "ROOT_CONCEPT_NAME": "Direct search",
+      "CONCEPT_CLASS_ID": null,
+      "DOMAIN_ID": null,
+      "INVALID_REASON": null,
+      "HIERARCHY_DEPTH": 0,
+      "RELATIONSHIPS": null
+    }
+  ],
+  "strategy": "direct-search",
+  "total_codes": 216
+}
